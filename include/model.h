@@ -41,10 +41,12 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<NumVarMatrix> fOA;							//Load on board vessel when starting to operate at port i in time period t
 		IloArray<NumVarMatrix> fOB;							//Load on board vessel before continuing to operate at port i in time period t
 		IloArray<NumVarMatrix> fW;							//Load on board vessel while waiting at port i in time period t
+		IloArray<NumVarMatrix> fWB;							//Load on board vessel while waiting at port i in time period t after operated in time t-1
 		
 		IloArray<IloArray<IloArray<IloBoolVarArray> > > x;	//Takes value 1 if vessel v travesses an arc departing from i and arriving at j, starting in time period t. Port 0 corresponds to the source node and port T+1 corresponds to the sink node
 		IloArray<IloArray<IloBoolVarArray> > z;				//Takes value 1 if vessel v attmpts to load/discharge at port j in time period t
 		IloArray<IloArray<IloBoolVarArray> > w;				//Takes value 1 if vessel v waits at port j in time period t
+		IloArray<IloArray<IloBoolVarArray> > wB;			//Takes value 1 if vessel v waits at port j in time period t after operated in time period t-1
 		IloArray<IloArray<IloBoolVarArray> > oA;			//Takes value 1 if vessel v starts to operate at port i in time t
 		IloArray<IloArray<IloBoolVarArray> > oB;			//Indicates the succeding operation at port i vessel v starts to operate at port i in time t
 		
@@ -101,6 +103,7 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloArray<IloRangeArray> >   flowCapacityOA;
 		IloArray<IloArray<IloRangeArray> >   flowCapacityOB;
 		IloArray<IloArray<IloRangeArray> >   flowCapacityW;
+		IloArray<IloArray<IloRangeArray> >   flowCapacityWB;
 		
 		
 		//Additional constraints;

@@ -53,6 +53,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	fOA = IloArray<NumVarMatrix> (env, V);
 	fOB = IloArray<NumVarMatrix> (env, V);
 	fW = IloArray<NumVarMatrix> (env, V);
+	fWB = IloArray<NumVarMatrix> (env, V);
 	
 	x = IloArray<IloArray<IloArray<IloBoolVarArray> > >(env, V);
 	hasArc = IloArray<IloArray<IloArray<IloIntArray> > >(env, V);
@@ -62,6 +63,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	oA = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	oB = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	w = IloArray<IloArray<IloBoolVarArray> >(env,V);
+	wB = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	
 	//Additional variables for branching
 	#ifndef NBranching		
@@ -73,11 +75,13 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		fOA[v] = NumVarMatrix(env,N);
 		fOB[v] = NumVarMatrix(env,N);
 		fW[v] = NumVarMatrix(env,N);
+		fWB[v] = NumVarMatrix(env,N);
 		
 		z[v] = IloArray<IloBoolVarArray>(env,N);
 		oA[v] = IloArray<IloBoolVarArray>(env,N);
 		oB[v] = IloArray<IloBoolVarArray>(env,N);
 		w[v] = IloArray<IloBoolVarArray>(env,N);
+		wB[v] = IloArray<IloBoolVarArray>(env,N);
 		x[v] = IloArray<IloArray<IloBoolVarArray> >(env, N);				
 		hasArc[v] = IloArray<IloArray<IloIntArray> >(env, N);				
 		arcCost[v] = IloArray<IloArray<IloNumArray> >(env, N);
@@ -107,10 +111,12 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				fOA[v][j] = IloNumVarArray(env, T);
 				fOB[v][j] = IloNumVarArray(env, T);
 				fW[v][j] = IloNumVarArray(env, T);
+				fWB[v][j] = IloNumVarArray(env, T);
 				z[v][j] = IloBoolVarArray(env, T);
 				oA[v][j] = IloBoolVarArray(env, T);
 				oB[v][j] = IloBoolVarArray(env, T);
 				w[v][j] = IloBoolVarArray(env, T);
+				wB[v][j] = IloBoolVarArray(env, T);
 				hasEnteringArc1st[v][j] = IloIntArray(env,T);
 				for(t=1;t<T;t++){				
 					stringstream ss;
@@ -139,6 +145,12 @@ void Model::buildModel(IloEnv& env, Instance inst){
 						ss.str(string());
 						ss << "w_(" << j << "," << t << ")," << v;
 						w[v][j][t].setName(ss.str().c_str());					
+						ss.str(string());
+						ss << "wB_(" << j << "," << t << ")," << v;
+						wB[v][j][t].setName(ss.str().c_str());
+						ss.str(string());
+						ss << "fWB_(" << j << "," << t << ")," << v;
+						fWB[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
 					}									
 				}		
 			}	
@@ -309,6 +321,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	flowCapacityOA = IloArray<IloArray<IloRangeArray> >(env,V);
 	flowCapacityOB = IloArray<IloArray<IloRangeArray> >(env,V);
 	flowCapacityW = IloArray<IloArray<IloRangeArray> >(env,V);
+	flowCapacityWB = IloArray<IloArray<IloRangeArray> >(env,V);
 	
 	for(i=1;i<N-1;i++){			
 		stringstream ss1;
@@ -370,6 +383,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		flowCapacityOA[v] = IloArray<IloRangeArray> (env,N-1);
 		flowCapacityOB[v] = IloArray<IloRangeArray> (env,N-1);
 		flowCapacityW[v] = IloArray<IloRangeArray> (env,N-1);
+		flowCapacityWB[v] = IloArray<IloRangeArray> (env,N-1);
 		
 		for(i=0;i<N;i++){
 			if(i>0 && i <= J){ //Only considering ports				//ERROR index superior inside 
@@ -421,9 +435,10 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				flowCapacityOA[v][i] = IloRangeArray(env,T);
 				flowCapacityOB[v][i] = IloRangeArray(env,T);
 				flowCapacityW[v][i] = IloRangeArray(env,T);
+				flowCapacityWB[v][i] = IloRangeArray(env,T);
 				
 				for(t=1;t<T;t++){
-					stringstream ss, ss1, ss2, ss3, ss4, ss5, ss6, ss7, ss8, ss9;
+					stringstream ss, ss1, ss2, ss3, ss4, ss5, ss6, ss7, ss8, ss9, ss10;
 					ss << "First_level_balance_" << v << "(" << i << "," << t << ")";
 					ss1 << "Second_level_balance_" << v << "(" << i << "," << t << ")";
 					ss2 << "link_balance_" << v << "(" << i << "," << t << ")";
@@ -517,10 +532,13 @@ void Model::buildModel(IloEnv& env, Instance inst){
 						if(t<T-1){ //Constraints with no last time index
 							ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
 							ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
+							ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
 							flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-inst.q_v[v]*oB[v][i][t], 0, ss8.str().c_str());
 							flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());
+							flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
 							model.add(flowCapacityOB[v][i][t]);
 							model.add(flowCapacityW[v][i][t]);
+							model.add(flowCapacityWB[v][i][t]);
 						}
 					//~ }
 				}				
@@ -720,7 +738,7 @@ void Model::printSolution(IloEnv env, Instance& inst){
 
 }
 void Model::setParameters(IloEnv& env, const double& timeLimit, const double& gap=1e-04){
-	cplex.exportModel("mip.lp");
+	//~ cplex.exportModel("mip.lp");
 	//~ env.setNormalizer(IloFalse);
 	//Pressolve
 	//~ cplex.setParam(IloCplex::PreInd,0);
@@ -735,6 +753,7 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//~ cplex.setParam(IloCplex::MIPEmphasis, 4); // RINS
 	//~ cplex.setParam(IloCplex::DiveType, 3); // Guied dive
 	cplex.setParam(IloCplex::WorkMem, 8192);
+	cplex.setParam(IloCplex::NodeFileInd, 2);
 	cplex.setParam(IloCplex::WorkDir, "workDir/");
 	cplex.setParam(IloCplex::ClockType, 2);
 	cplex.setParam(IloCplex::TiLim, timeLimit);
