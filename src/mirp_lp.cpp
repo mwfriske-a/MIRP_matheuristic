@@ -14,9 +14,8 @@
 #include <ilcplex/ilocplex.h>
 #include "../include/util.h"
 #include "../include/model.h"
-//~ #define NDEBUG
+#define NDEBUG
 #include <assert.h>
-#define UselessVariables
 //~ #define NSpotMarket
 //~ #define NTravelAtCapacity
 //~ #define NTravelEmpty
@@ -26,6 +25,8 @@
 #define NOperateAndGo
 #define N2PortNorevisit
 #define NRelaxation
+//~ #define NWaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
+#define NKnapsackCutsLoadingPorts		
 
 ILOSTLBEGIN
 
@@ -52,18 +53,22 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	fX = IloArray<IloArray<NumVarMatrix> >(env, V);
 	fOA = IloArray<NumVarMatrix> (env, V);
 	fOB = IloArray<NumVarMatrix> (env, V);
-	fW = IloArray<NumVarMatrix> (env, V);
-	fWB = IloArray<NumVarMatrix> (env, V);
+	fW = IloArray<NumVarMatrix> (env, V);		
 	
-	x = IloArray<IloArray<IloArray<IloBoolVarArray> > >(env, V);
 	hasArc = IloArray<IloArray<IloArray<IloIntArray> > >(env, V);
 	arcCost = IloArray<IloArray<IloArray<IloNumArray> > >(env, V);
 	hasEnteringArc1st = IloArray<IloArray<IloIntArray> >(env, V);
+	
+	x = IloArray<IloArray<IloArray<IloBoolVarArray> > >(env, V);
 	z = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	oA = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	oB = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	w = IloArray<IloArray<IloBoolVarArray> >(env,V);
+	
+	#ifdef NWaitAfterOperate
+	fWB = IloArray<NumVarMatrix> (env, V);	
 	wB = IloArray<IloArray<IloBoolVarArray> >(env,V);
+	#endif
 	
 	//Additional variables for branching
 	#ifndef NBranching		
@@ -74,26 +79,30 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		fX[v] = IloArray<NumVarMatrix>(env,N);
 		fOA[v] = NumVarMatrix(env,N);
 		fOB[v] = NumVarMatrix(env,N);
-		fW[v] = NumVarMatrix(env,N);
-		fWB[v] = NumVarMatrix(env,N);
+		fW[v] = NumVarMatrix(env,N);				
 		
 		z[v] = IloArray<IloBoolVarArray>(env,N);
 		oA[v] = IloArray<IloBoolVarArray>(env,N);
 		oB[v] = IloArray<IloBoolVarArray>(env,N);
-		w[v] = IloArray<IloBoolVarArray>(env,N);
-		wB[v] = IloArray<IloBoolVarArray>(env,N);
-		x[v] = IloArray<IloArray<IloBoolVarArray> >(env, N);				
+		w[v] = IloArray<IloBoolVarArray>(env,N);		
+		x[v] = IloArray<IloArray<IloBoolVarArray> >(env, N);	
+					
 		hasArc[v] = IloArray<IloArray<IloIntArray> >(env, N);				
 		arcCost[v] = IloArray<IloArray<IloNumArray> >(env, N);
 		hasEnteringArc1st[v] = IloArray<IloIntArray>(env, N);
-			
+		
+		#ifdef NWaitAfterOperate
+		fWB[v] = NumVarMatrix(env,N);		
+		wB[v] = IloArray<IloBoolVarArray>(env,N);
+		#endif	
+				
 		for(j=0;j<N;j++){			
 			x[v][j] = IloArray<IloBoolVarArray>(env,N);
 			hasArc[v][j] = IloArray<IloIntArray>(env,N);
 			arcCost[v][j] = IloArray<IloNumArray>(env,N);			
 			fX[v][j] = IloArray<IloNumVarArray>(env, N);
-			for(i=0;i<N;i++){
-				x[v][j][i] = IloBoolVarArray(env,T);
+			for(i=0;i<N;i++){				
+				x[v][j][i] = IloBoolVarArray(env,T);				
 				hasArc[v][j][i] = IloIntArray(env,T);
 				arcCost[v][j][i] = IloNumArray(env,T);
 				fX[v][j][i] = IloNumVarArray(env, T);
@@ -104,6 +113,10 @@ void Model::buildModel(IloEnv& env, Instance inst){
 					ss.str(string());
 					ss << "fX_"<<v<<","<<j<<","<<i<<","<<t;
 					fX[v][j][i][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
+					#ifndef NRelaxation
+					IloConversion conv(env, x[v][j][i][t],ILOFLOAT);
+					model.add(conv);
+					#endif
 				}
 			}
 			if(j>0 && j<=J){ //Only considering Ports
@@ -111,13 +124,18 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				fOA[v][j] = IloNumVarArray(env, T);
 				fOB[v][j] = IloNumVarArray(env, T);
 				fW[v][j] = IloNumVarArray(env, T);
-				fWB[v][j] = IloNumVarArray(env, T);
+				
 				z[v][j] = IloBoolVarArray(env, T);
 				oA[v][j] = IloBoolVarArray(env, T);
 				oB[v][j] = IloBoolVarArray(env, T);
 				w[v][j] = IloBoolVarArray(env, T);
-				wB[v][j] = IloBoolVarArray(env, T);
+				
 				hasEnteringArc1st[v][j] = IloIntArray(env,T);
+				#ifdef NWaitAfterOperate
+				wB[v][j] = IloBoolVarArray(env, T);
+				fWB[v][j] = IloNumVarArray(env, T);
+				#endif
+				
 				for(t=1;t<T;t++){				
 					stringstream ss;
 					ss << "f_(" << j << "," << t << ")," << v;
@@ -131,7 +149,13 @@ void Model::buildModel(IloEnv& env, Instance inst){
 					z[v][j][t].setName(ss.str().c_str());
 					ss.str(string());
 					ss << "oA_(" << j << "," << t << ")," << v;
-					oA[v][j][t].setName(ss.str().c_str());					
+					oA[v][j][t].setName(ss.str().c_str());	
+					#ifndef NRelaxation
+					IloConversion convZ(env,z[v][j][t], ILOFLOAT);
+					model.add(convZ);
+					IloConversion convOA(env,oA[v][j][t], ILOFLOAT);
+					model.add(convOA);
+					#endif 				
 					if(t<T-1){ //Variables that haven't last time index
 						ss.str(string());
 						ss << "fOB_(" << j << "," << t << ")," << v;
@@ -144,13 +168,25 @@ void Model::buildModel(IloEnv& env, Instance inst){
 						oB[v][j][t].setName(ss.str().c_str());
 						ss.str(string());
 						ss << "w_(" << j << "," << t << ")," << v;
-						w[v][j][t].setName(ss.str().c_str());					
-						ss.str(string());
-						ss << "wB_(" << j << "," << t << ")," << v;
-						wB[v][j][t].setName(ss.str().c_str());
-						ss.str(string());
-						ss << "fWB_(" << j << "," << t << ")," << v;
-						fWB[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
+						w[v][j][t].setName(ss.str().c_str());
+						#ifndef NRelaxation
+						IloConversion convW(env,w[v][j][t], ILOFLOAT);
+						model.add(convW);
+						IloConversion convOB(env,oB[v][j][t], ILOFLOAT);
+						model.add(convOB);
+						#endif
+						#ifdef NWaitAfterOperate
+							ss.str(string());
+							ss << "wB_(" << j << "," << t << ")," << v;
+							wB[v][j][t].setName(ss.str().c_str());					
+							ss.str(string());
+							ss << "fWB_(" << j << "," << t << ")," << v;
+							fWB[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
+							#ifndef NRelaxation
+							IloConversion convWB(env,wB[v][j][t], ILOFLOAT);
+							model.add(convWB);
+							#endif
+						#endif
 					}									
 				}		
 			}	
@@ -274,7 +310,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	}
 	obj.setExpr(expr1-expr);	
 	model.add(obj);
-	//~ cout << hasEnteringArc1st[0][4][7] << endl;
+	
 	///Constraints
 	//Flow balance source and sink nodes
 	IloExpr expr_sinkFlow(env);
@@ -321,8 +357,10 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	flowCapacityOA = IloArray<IloArray<IloRangeArray> >(env,V);
 	flowCapacityOB = IloArray<IloArray<IloRangeArray> >(env,V);
 	flowCapacityW = IloArray<IloArray<IloRangeArray> >(env,V);
-	flowCapacityWB = IloArray<IloArray<IloRangeArray> >(env,V);
 	
+	#ifdef NWaitAfterOperate
+	flowCapacityWB = IloArray<IloArray<IloRangeArray> >(env,V);
+	#endif
 	for(i=1;i<N-1;i++){			
 		stringstream ss1;
 		berthLimit[i] = IloRangeArray(env,T);
@@ -383,10 +421,12 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		flowCapacityOA[v] = IloArray<IloRangeArray> (env,N-1);
 		flowCapacityOB[v] = IloArray<IloRangeArray> (env,N-1);
 		flowCapacityW[v] = IloArray<IloRangeArray> (env,N-1);
+		#ifdef NWaitAfterOperate
 		flowCapacityWB[v] = IloArray<IloRangeArray> (env,N-1);
+		#endif
 		
 		for(i=0;i<N;i++){
-			if(i>0 && i <= J){ //Only considering ports				//ERROR index superior inside 
+			if(i>0 && i <= J){ //Only considering ports				
 				firstLevelBalance[v][i] = IloRangeArray(env,T,0,0); //Id 0 is not used				
 				secondLevelBalance[v][i] = IloRangeArray(env,T,0,0); 
 				firstLevelFlow[v][i] = IloRangeArray(env,T,0,0); 
@@ -435,7 +475,9 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				flowCapacityOA[v][i] = IloRangeArray(env,T);
 				flowCapacityOB[v][i] = IloRangeArray(env,T);
 				flowCapacityW[v][i] = IloRangeArray(env,T);
+				#ifdef NWaitAfterOperate
 				flowCapacityWB[v][i] = IloRangeArray(env,T);
+				#endif
 				
 				for(t=1;t<T;t++){
 					stringstream ss, ss1, ss2, ss3, ss4, ss5, ss6, ss7, ss8, ss9, ss10;
@@ -480,26 +522,60 @@ void Model::buildModel(IloEnv& env, Instance inst){
 									expr_2ndFlow += fX[v][i][j][t];
 								}
 							}
-						}
+						}						
+						IloExpr expr_link;
+						#ifndef NWaitAfterOperate						
 						if (t==1 || hasEnteringArc1st[v][i][t-1]==0){ //First time period or not entering arc in the previous time period
-							firstLevelBalance[v][i][t].setExpr(expr_1stLevel - w[v][i][t] - oA[v][i][t]);
-							secondLevelBalance[v][i][t].setExpr(oA[v][i][t]-oB[v][i][t] - expr_2ndLevel);
-							linkBalance[v][i][t].setExpr(oA[v][i][t] - z[v][i][t]);
-							firstLevelFlow[v][i][t].setExpr(expr_1stFlow - fW[v][i][t] - fOA[v][i][t]);
-							secondLevelFlow[v][i][t].setExpr(fOA[v][i][t] + inst.delta[i-1]*f[v][i][t] - fOB[v][i][t] - expr_2ndFlow);
+							expr_1stLevel += - w[v][i][t] - oA[v][i][t];							
+							expr_2ndLevel += -oA[v][i][t] + oB[v][i][t];							
+							//~ secondLevelBalance[v][i][t].setExpr(oA[v][i][t]-oB[v][i][t] - expr_2ndLevel);
+							expr_link = oA[v][i][t] - z[v][i][t];							
+							expr_1stFlow+= -fW[v][i][t] - fOA[v][i][t];							
+							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t];
 						}else if (t==T-1){ //Last time period
-							firstLevelBalance[v][i][t].setExpr(expr_1stLevel + w[v][i][t-1] - oA[v][i][t]);
-							secondLevelBalance[v][i][t].setExpr(oA[v][i][t] + oB[v][i][t-1] - expr_2ndLevel);
-							linkBalance[v][i][t].setExpr(oA[v][i][t] + oB[v][i][t-1] - z[v][i][t]);
-							firstLevelFlow[v][i][t].setExpr(expr_1stFlow + fW[v][i][t-1] - fOA[v][i][t]);
-							secondLevelFlow[v][i][t].setExpr(fOA[v][i][t] + fOB[v][i][t-1] + inst.delta[i-1]*f[v][i][t] - expr_2ndFlow);
+							expr_1stLevel += w[v][i][t-1] - oA[v][i][t];							
+							expr_2ndLevel += -oA[v][i][t] -oB[v][i][t-1];
+							expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];
+							expr_1stFlow += fW[v][i][t-1] - fOA[v][i][t];
+							expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t];
 						}else{ //Other times
-							firstLevelBalance[v][i][t].setExpr(expr_1stLevel + w[v][i][t-1] - w[v][i][t] - oA[v][i][t]);
-							secondLevelBalance[v][i][t].setExpr(oA[v][i][t] + oB[v][i][t-1] - oB[v][i][t] - expr_2ndLevel);					
-							linkBalance[v][i][t].setExpr(oA[v][i][t] + oB[v][i][t-1] - z[v][i][t]);
-							firstLevelFlow[v][i][t].setExpr(expr_1stFlow + fW[v][i][t-1] - fW[v][i][t] - fOA[v][i][t]);
-							secondLevelFlow[v][i][t].setExpr(fOA[v][i][t] + fOB[v][i][t-1] + inst.delta[i-1]*f[v][i][t] -fOB[v][i][t] - expr_2ndFlow);
+							expr_1stLevel += w[v][i][t-1] - w[v][i][t] - oA[v][i][t];
+							expr_2ndLevel += - oA[v][i][t] - oB[v][i][t-1] + oB[v][i][t];
+							//~ secondLevelBalance[v][i][t].setExpr(oA[v][i][t] + oB[v][i][t-1] - oB[v][i][t] - expr_2ndLevel);					
+							expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];
+							expr_1stFlow += fW[v][i][t-1] - fW[v][i][t] - fOA[v][i][t];
+							expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t];
+							//~ secondLevelFlow[v][i][t].setExpr(fOA[v][i][t] + fOB[v][i][t-1] + inst.delta[i-1]*f[v][i][t] -fOB[v][i][t] - expr_2ndFlow);
 						}
+						#endif
+						#ifdef NWaitAfterOperate						
+						if (t==1 || hasEnteringArc1st[v][i][t-1]==0){ //First time period or not entering arc in the previous time period
+							expr_1stLevel += - w[v][i][t] - oA[v][i][t];
+							expr_2ndLevel += -oA[v][i][t] + oB[v][i][t] + wB[v][i][t];
+							expr_link = oA[v][i][t] - z[v][i][t];							
+							expr_1stFlow+= -fW[v][i][t] - fOA[v][i][t];							
+							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t] + fWB[v][i][t];
+						}else if (t==T-1){ //Last time period
+							expr_1stLevel += w[v][i][t-1] - oA[v][i][t] + wB[v][i][t-1];
+							expr_2ndLevel += -oA[v][i][t] -oB[v][i][t-1];
+							expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];
+							expr_1stFlow += fW[v][i][t-1] - fOA[v][i][t] + fWB[v][i][t-1];
+							expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t];
+						}else{ //Other times
+							expr_1stLevel += w[v][i][t-1] - w[v][i][t] - oA[v][i][t] + wB[v][i][t-1];
+							expr_2ndLevel += - oA[v][i][t] - oB[v][i][t-1] + oB[v][i][t] + wB[v][i][t];							
+							expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];
+							expr_1stFlow += fW[v][i][t-1] - fW[v][i][t] - fOA[v][i][t] + fWB[v][i][t-1];
+							expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t] + fWB[v][i][t];
+						}
+						#endif
+						
+						firstLevelBalance[v][i][t].setExpr(expr_1stLevel);
+						secondLevelBalance[v][i][t].setExpr(expr_2ndLevel);
+						linkBalance[v][i][t].setExpr(expr_link);
+						firstLevelFlow[v][i][t].setExpr(expr_1stFlow);
+						secondLevelFlow[v][i][t].setExpr(expr_2ndFlow);
+						
 						firstLevelBalance[v][i][t].setName(ss.str().c_str());
 						model.add(firstLevelBalance[v][i][t]);
 						
@@ -531,14 +607,16 @@ void Model::buildModel(IloEnv& env, Instance inst){
 						
 						if(t<T-1){ //Constraints with no last time index
 							ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
-							ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
-							ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
+							ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;							
 							flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-inst.q_v[v]*oB[v][i][t], 0, ss8.str().c_str());
-							flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());
-							flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
+							flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());							
 							model.add(flowCapacityOB[v][i][t]);
 							model.add(flowCapacityW[v][i][t]);
+							#ifdef NWaitAfterOperate
+							ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
+							flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
 							model.add(flowCapacityWB[v][i][t]);
+							#endif							
 						}
 					//~ }
 				}				
@@ -830,7 +908,7 @@ void mirp::milp(string file, const double& timeLimit, string optStr){
 			cout << model.cplex.getNbinVars() << " \t & " << model.cplex.getNintVars() << " \t & " << model.cplex.getNcols() << " \t & " << model.cplex.getNrows() << " \t & "
 			<< "\t & \t & \t & \t & \t & \t" <<  opt_time << " & \t & \t & " << model.cplex.getNiterations() << " \t & " << model.cplex.getNnodes() << " \\\\";		
 		}
-		model.printSolution(env, inst);
+		//~ model.printSolution(env, inst);
 	}catch (IloException& e) {
 	cerr << "Concert exception caught: " << e << endl;		
 	e.end();

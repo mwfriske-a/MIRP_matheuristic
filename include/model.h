@@ -59,10 +59,13 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloArray<IloArray<IloNumArray> > > arcCost;	//Cost of travelling arc if hasArc == 1
 		IloArray<IloArray<IloIntArray> > hasEnteringArc1st;		//Takes value 1 if node v,i,t has an entering arc in the first level(source,traveling,or waiting). i \in J
 		
-		//Conversion - For relax the model
+		//Conversion - For relax-and-fix 
 		IloArray<IloArray<IloArray<IloArray<IloConversion> > > > convertX; //Convert x variables according [v][i][j][t]
 		IloArray<IloArray<IloArray<IloConversion> > > convertZ; //Convert z variables according to time ([v][i][t])		
 		IloArray<IloArray<IloArray<IloConversion> > > convertW; //Convert w variables according to time ([v][i][t])
+		IloArray<IloArray<IloArray<IloConversion> > > convertWB; //Convert w variables according to time ([v][i][t])
+		IloArray<IloArray<IloArray<IloConversion> > > convertOA; //Convert w variables according to time ([v][i][t])
+		IloArray<IloArray<IloArray<IloConversion> > > convertOB; //Convert w variables according to time ([v][i][t])
 		
 		//Store variables values 
 		IloArray<IloArray<IloArray<IloNumArray> > > xValue;
@@ -104,6 +107,10 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloArray<IloRangeArray> >   flowCapacityOB;
 		IloArray<IloArray<IloRangeArray> >   flowCapacityW;
 		IloArray<IloArray<IloRangeArray> >   flowCapacityWB;
+		
+		//Valid inequalities
+		IloArray<IloRangeArray> knapsack_P_1; //Inequalities for the case where T_v = T
+		IloArray<IloRangeArray> knapsack_P_2; //Inequalities for the case where T_v = \emptyset
 		
 		
 		//Additional constraints;
