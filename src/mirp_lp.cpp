@@ -21,12 +21,9 @@
 //~ #define NTravelEmpty
 //~ #define NBerthLimit
 #define NBranching
-#define NValidInequalities
-#define NOperateAndGo
-#define N2PortNorevisit
 #define NRelaxation
-//~ #define NWaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
-#define NKnapsackCutsLoadingPorts		
+#define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
+//~ #define NKnapsackInequalities
 
 ILOSTLBEGIN
 
@@ -65,7 +62,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	oB = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	w = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	
-	#ifdef NWaitAfterOperate
+	#ifdef WaitAfterOperate
 	fWB = IloArray<NumVarMatrix> (env, V);	
 	wB = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	#endif
@@ -91,7 +88,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		arcCost[v] = IloArray<IloArray<IloNumArray> >(env, N);
 		hasEnteringArc1st[v] = IloArray<IloIntArray>(env, N);
 		
-		#ifdef NWaitAfterOperate
+		#ifdef WaitAfterOperate
 		fWB[v] = NumVarMatrix(env,N);		
 		wB[v] = IloArray<IloBoolVarArray>(env,N);
 		#endif	
@@ -131,7 +128,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				w[v][j] = IloBoolVarArray(env, T);
 				
 				hasEnteringArc1st[v][j] = IloIntArray(env,T);
-				#ifdef NWaitAfterOperate
+				#ifdef WaitAfterOperate
 				wB[v][j] = IloBoolVarArray(env, T);
 				fWB[v][j] = IloNumVarArray(env, T);
 				#endif
@@ -175,7 +172,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 						IloConversion convOB(env,oB[v][j][t], ILOFLOAT);
 						model.add(convOB);
 						#endif
-						#ifdef NWaitAfterOperate
+						#ifdef WaitAfterOperate
 							ss.str(string());
 							ss << "wB_(" << j << "," << t << ")," << v;
 							wB[v][j][t].setName(ss.str().c_str());					
@@ -358,20 +355,128 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	flowCapacityOB = IloArray<IloArray<IloRangeArray> >(env,V);
 	flowCapacityW = IloArray<IloArray<IloRangeArray> >(env,V);
 	
-	#ifdef NWaitAfterOperate
+	#ifdef WaitAfterOperate
 	flowCapacityWB = IloArray<IloArray<IloRangeArray> >(env,V);
 	#endif
-	for(i=1;i<N-1;i++){			
+	
+	#ifndef NKnapsackInequalities
+	knapsack_P_1 = IloArray<IloRangeArray> (env, J+1);			//Altough created for all J ports, it is only considered for loading(production) or consumption(discharging) ports
+	knapsack_P_2 = IloArray<IloRangeArray> (env, J+1);	
+	knapsack_D_1 = IloArray<IloRangeArray> (env, J+1);	
+	knapsack_D_2 = IloArray<IloRangeArray> (env, J+1);	
+	knapsack_D_3 = IloArray<IloRangeArray> (env, J+1);	
+	#endif
+	
+	for(i=1;i<N-1;i++){
 		stringstream ss1;
 		berthLimit[i] = IloRangeArray(env,T);
 		expr_cumSlack.clear();
 		portInventory[i] = IloRangeArray(env,T);				
+		#ifndef NKnapsackInequalities
+		if (inst.typePort[i-1] == 0){ 	//Loading port
+			knapsack_P_1[i] = IloRangeArray(env, (T-3)*2);		//(T-2)*2 = Number of combinations 1,...t + t,...,T for all t \in T. Using T-3 because de increment
+			knapsack_P_2[i] = IloRangeArray(env, (T-3)*2);
+		}else{							//Discharging port
+			knapsack_D_1[i] = IloRangeArray(env, (T-3)*2);
+			knapsack_D_2[i] = IloRangeArray(env, (T-3)*2);
+			knapsack_D_3[i] = IloRangeArray(env, (T-3)*2);
+		}
+		int it,k,l;
+		IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);
+		double kP1_RHS, kP2_RHS, kD1_RHS, kD2_RHS;			
+		for(it=0;it<(T-3)*2;it++){	//For each valid inequality
+			expr_kP1_LHS.clear();
+			expr_kP2_LHS.clear();
+			expr_kD1_LHS.clear();
+			expr_kD2_LHS.clear();			
+			//Definining the size of set T =[k,l]
+			k=1;
+			l=T-1;
+			if(it<T-3)
+				l = it+2;
+			else
+				k = it+4-l;
+			for(v=0;v<V;v++){
+				#ifdef WaitAfterOperate
+				expr_kP1_LHS += oB[v][i][k] + wB[v][i][k];
+				if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
+					expr_kD1_LHS += w[v][i][k-1] + wB[v][i][k-1] + oB[v][i][k-1];
+				#endif
+				
+				#ifndef WaitAfterOperate
+				expr_kP1_LHS += oB[v][i][k];
+				if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
+					expr_kD1_LHS += w[v][i][k-1] + oB[v][i][k-1];
+				#endif
+				if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
+					expr_kD2_LHS += oB[v][i][k-1];
+				for(t=k;t<=l;t++){
+					expr_kP2_LHS += z[v][i][t];	//It is used for both loading and discharging ports
+					expr_kD2_LHS += oA[v][i][t];
+					for(j=0;j<N;j++){						
+						if(j==0 && inst.initialPort[v]+1 == i && t==inst.firstTimeAv[v]+1) 	//Source arc
+							expr_kD1_LHS += x[v][j][i][0];								
+						else if (j == N-1 && hasArc[v][i][j][t] == 1)						//Sink arc
+							expr_kP1_LHS += x[v][i][j][t];
+						else if (j > 0 && j<N-1){											//"Normal" arcs							 																
+							if(i != j){
+								if(hasArc[v][i][j][t] == 1)
+									expr_kP1_LHS += x[v][i][j][t];
+								if(t - inst.travelTime[v][j-1][i-1] >= 0){					//Only if it is possible an entering arc due the travel time
+									if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1)
+										expr_kD1_LHS += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];										
+								}
+							}
+						}
+					}
+				}
+			}
+			for(t=k;t<=l;t++){
+				kP1_RHS += inst.d_jt[i-1][t-1];				
+				kD1_RHS += inst.d_jt[i-1][t-1];
+			}
+			kP1_RHS += -inst.sMax_jt[i-1][0];
+			kP2_RHS = ceil(kP1_RHS/inst.f_max_jt[i-1][0]);
+			kP1_RHS = ceil(kP1_RHS/inst.maxCapacity);
+			
+			if(k==1)
+				kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0];
+			else
+				kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0];
+			kD2_RHS = ceil(kD1_RHS/inst.f_max_jt[i-1][0]);
+			kD1_RHS = ceil(kD1_RHS/inst.maxCapacity);
+			
+			stringstream ss, ss1, ss2;
+			if(inst.typePort[i-1] == 0){
+				ss << "knpasackP1_" << i << "," << it;
+				knapsack_P_1[i][it] = IloRange(env, kP1_RHS, expr_kP1_LHS, IloInfinity, ss.str().c_str());
+				ss1 << "knapsackP2_" << i << "," << it;
+				knapsack_P_2[i][it] = IloRange(env, kP2_RHS, expr_kP2_LHS, IloInfinity, ss1.str().c_str());
+			}else{
+				ss << "knpasackD1_" << i << "," << it;
+				knapsack_D_1[i][it] = IloRange(env, kD1_RHS, expr_kD1_LHS, IloInfinity, ss.str().c_str());
+				ss1 << "knpasackD2_" << i << "," << it;
+				knapsack_D_2[i][it] = IloRange(env, kD1_RHS, expr_kD2_LHS, IloInfinity, ss1.str().c_str());
+				ss2 << "knpasackD3_" << i << "," << it;
+				knapsack_D_3[i][it] = IloRange(env, kD2_RHS, expr_kP2_LHS, IloInfinity, ss2.str().c_str());
+			}
+		}
+		if(inst.typePort[i-1] == 0){
+			model.add(knapsack_P_1[i]);
+			model.add(knapsack_P_2[i]);
+		}else{
+			model.add(knapsack_D_1[i]);
+			model.add(knapsack_D_2[i]);
+			model.add(knapsack_D_3[i]);
+		}		
+		#endif
+		
 		for(t=1;t<T;t++){
 			expr_berth.clear();
 			expr_invBalancePort.clear();
 			stringstream ss, ss2;
 			ss << "berthLimit_(" << i << "," << t << ")";
-			bool emptyExpr = true;
+			bool emptyExpr = true;			
 			for(v=0;v<V;v++){				
 				if (hasEnteringArc1st[v][i][t]==1){ //Only if exists an entering arc in the node				
 					expr_berth += z[v][i][t];
@@ -398,6 +503,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		model.add(cumSlack[i]);
 		
 	}	
+	
 	expr_cumSlack.end();
 	expr_berth.end();
 	expr_invBalancePort.end();
@@ -421,7 +527,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		flowCapacityOA[v] = IloArray<IloRangeArray> (env,N-1);
 		flowCapacityOB[v] = IloArray<IloRangeArray> (env,N-1);
 		flowCapacityW[v] = IloArray<IloRangeArray> (env,N-1);
-		#ifdef NWaitAfterOperate
+		#ifdef WaitAfterOperate
 		flowCapacityWB[v] = IloArray<IloRangeArray> (env,N-1);
 		#endif
 		
@@ -475,7 +581,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				flowCapacityOA[v][i] = IloRangeArray(env,T);
 				flowCapacityOB[v][i] = IloRangeArray(env,T);
 				flowCapacityW[v][i] = IloRangeArray(env,T);
-				#ifdef NWaitAfterOperate
+				#ifdef WaitAfterOperate
 				flowCapacityWB[v][i] = IloRangeArray(env,T);
 				#endif
 				
@@ -524,7 +630,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 							}
 						}						
 						IloExpr expr_link;
-						#ifndef NWaitAfterOperate						
+						#ifndef WaitAfterOperate						
 						if (t==1 || hasEnteringArc1st[v][i][t-1]==0){ //First time period or not entering arc in the previous time period
 							expr_1stLevel += - w[v][i][t] - oA[v][i][t];							
 							expr_2ndLevel += -oA[v][i][t] + oB[v][i][t];							
@@ -548,7 +654,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 							//~ secondLevelFlow[v][i][t].setExpr(fOA[v][i][t] + fOB[v][i][t-1] + inst.delta[i-1]*f[v][i][t] -fOB[v][i][t] - expr_2ndFlow);
 						}
 						#endif
-						#ifdef NWaitAfterOperate						
+						#ifdef WaitAfterOperate						
 						if (t==1 || hasEnteringArc1st[v][i][t-1]==0){ //First time period or not entering arc in the previous time period
 							expr_1stLevel += - w[v][i][t] - oA[v][i][t];
 							expr_2ndLevel += -oA[v][i][t] + oB[v][i][t] + wB[v][i][t];
@@ -612,7 +718,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 							flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());							
 							model.add(flowCapacityOB[v][i][t]);
 							model.add(flowCapacityW[v][i][t]);
-							#ifdef NWaitAfterOperate
+							#ifdef WaitAfterOperate
 							ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
 							flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
 							model.add(flowCapacityWB[v][i][t]);
@@ -718,7 +824,7 @@ void Model::printSolution(IloEnv env, Instance& inst){
 				for(t=1;t<T;t++){
 					if(hasEnteringArc1st[v][i][t]){
 						zValue[v][i][t] = cplex.getValue(z[v][i][t]);					
-						cout << "Z value " << v << " " << i << " " << t << " " << zValue[v][i][t] << endl;
+						//~ cout << "Z value " << v << " " << i << " " << t << " " << zValue[v][i][t] << endl;
 						if(zValue[v][i][t]>=0.1)
 							costAtempt += (t-1)*inst.attemptCost;
 						
@@ -764,10 +870,10 @@ void Model::printSolution(IloEnv env, Instance& inst){
 				alphaValue[i][t] = cplex.getValue(alpha[i][t]);
 				if (alphaValue[i][t] >= 0.1)
 					costSpot += inst.p_jt[i-1][t-1];
-				cout << "Port stock (" << i << "," << t << "): " << sPValue[i][t] << 
-			" Alpha: " << alphaValue[i][t] << endl;
-			}else
-				cout << "Port stock (" << i << "," << t << "): " << sPValue[i][t] << endl;
+				//~ cout << "Port stock (" << i << "," << t << "): " << sPValue[i][t] << " Alpha: " << alphaValue[i][t] << endl;
+			}
+			//~ }else
+				//~ cout << "Port stock (" << i << "," << t << "): " << sPValue[i][t] << endl;
 		}
 	}
 	
@@ -822,6 +928,19 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//~ cplex.setParam(IloCplex::PreInd,0);
 	//~ cplex.setParam(IloCplex::RelaxPreInd,0);
 	//~ cplex.setParam(IloCplex::PreslvNd,-1);
+	
+	//Cuts
+	//~ cplex.setParam(IloCplex::Covers, 3);		//Max 3
+	//~ cplex.setParam(IloCplex::GUBCovers, 2);		//Max 2
+	//~ cplex.setParam(IloCplex::FlowCovers, 2);	//Max 2
+	//~ cplex.setParam(IloCplex::Cliques, 3);		//Max 3
+	//~ cplex.setParam(IloCplex::FracCuts, 2);		//Max 2
+	//~ cplex.setParam(IloCplex::DisjCuts, 3);		//Max 3
+	//~ cplex.setParam(IloCplex::FlowPaths, 2);		//Max 2
+	//~ cplex.setParam(IloCplex::ImplBd, 2);		//Max 2
+	//~ cplex.setParam(IloCplex::MIRCuts, 2);		//Max 2
+	//~ cplex.setParam(IloCplex::MCFCuts, 2);		//Max 2
+	//~ cplex.setParam(IloCplex::ZeroHalfCuts, 2);	//Max 2
 	
 	//~ cplex.setOut(env.getNullStream());
 	cplex.setWarning(env.getNullStream());
@@ -908,7 +1027,7 @@ void mirp::milp(string file, const double& timeLimit, string optStr){
 			cout << model.cplex.getNbinVars() << " \t & " << model.cplex.getNintVars() << " \t & " << model.cplex.getNcols() << " \t & " << model.cplex.getNrows() << " \t & "
 			<< "\t & \t & \t & \t & \t & \t" <<  opt_time << " & \t & \t & " << model.cplex.getNiterations() << " \t & " << model.cplex.getNnodes() << " \\\\";		
 		}
-		//~ model.printSolution(env, inst);
+		model.printSolution(env, inst);
 	}catch (IloException& e) {
 	cerr << "Concert exception caught: " << e << endl;		
 	e.end();

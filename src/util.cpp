@@ -467,9 +467,12 @@ void Instance::readInstance(IloEnv& env, const string& name){
 	IloNumArray avgSpeedInKnots(env,vC);   
 	IloNumArray travelCostAsTermPerKm(env,vC);   
 	IloNumArray discountTravelingEmpty(env,vC);   
+	maxCapacity = 0;
 	for (i=0;i<vC;i++){
 		for (j=0;j<3;j++) getline(vClass,s);
 		stringstream(s) >> s1 >> capacity[i];
+		if(capacity[i] > maxCapacity)
+			maxCapacity = capacity[i];
 		
 		getline(vClass,s);
 		stringstream(s) >> s1 >> avgSpeedInKnots[i];

@@ -108,9 +108,14 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloArray<IloRangeArray> >   flowCapacityW;
 		IloArray<IloArray<IloRangeArray> >   flowCapacityWB;
 		
-		//Valid inequalities
+		///Valid inequalities
+		//Loading ports
 		IloArray<IloRangeArray> knapsack_P_1; //Inequalities for the case where T_v = T
 		IloArray<IloRangeArray> knapsack_P_2; //Inequalities for the case where T_v = \emptyset
+		//Dischargin ports
+		IloArray<IloRangeArray> knapsack_D_1; //Case R²_v = T
+		IloArray<IloRangeArray> knapsack_D_2; //Case R¹_v = T
+		IloArray<IloRangeArray> knapsack_D_3; //Case R⁰_v = T
 		
 		
 		//Additional constraints;

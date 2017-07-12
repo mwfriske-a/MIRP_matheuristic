@@ -100,7 +100,7 @@ IloNumArray q_v; 			// Capacity of vessel v
 IloNumArray speed;			// Speed of vessel v
 IloNumArray costKm;			// Cost per km of vessel v
 IloNumArray trav_empt;		// Discont factor for traveling empty
-
+double maxCapacity;			// Maximum capacity between vessel classes;
 //Identifiers
 IntMatrix identifyVessel;
 IloIntArray idRegion; //Storage the region id of each vessel j
