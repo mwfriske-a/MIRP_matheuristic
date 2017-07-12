@@ -382,14 +382,14 @@ void Model::buildModel(IloEnv& env, Instance inst){
 			knapsack_D_3[i] = IloRangeArray(env, (T-3)*2);
 		}
 		int it,k,l;
-		IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);
-		double kP1_RHS, kP2_RHS, kD1_RHS, kD2_RHS;			
+		IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);					
 		for(it=0;it<(T-3)*2;it++){	//For each valid inequality
+			double kP1_RHS=0, kP2_RHS=0, kD1_RHS=0, kD2_RHS=0, sum_alphaMax=0, alphaUB=0;
 			expr_kP1_LHS.clear();
 			expr_kP2_LHS.clear();
 			expr_kD1_LHS.clear();
 			expr_kD2_LHS.clear();			
-			//Definining the size of set T =[k,l]
+			//Definining the size of set T =[k,l] - CAUTION: It is inverse of the paper of Agra et al (2013)
 			k=1;
 			l=T-1;
 			if(it<T-3)
@@ -432,17 +432,19 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				}
 			}
 			for(t=k;t<=l;t++){
+				//~ sum_alphaMax += inst.alp_max_jt[i-1][t-1];
 				kP1_RHS += inst.d_jt[i-1][t-1];				
 				kD1_RHS += inst.d_jt[i-1][t-1];
 			}
-			kP1_RHS += -inst.sMax_jt[i-1][0];
+			//~ alphaUB = min(sum_alphaMax, inst.alp_max_j[i-1]);
+			kP1_RHS += -inst.sMax_jt[i-1][0] - alphaUB;
 			kP2_RHS = ceil(kP1_RHS/inst.f_max_jt[i-1][0]);
 			kP1_RHS = ceil(kP1_RHS/inst.maxCapacity);
 			
 			if(k==1)
-				kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0];
+				kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0] - alphaUB;
 			else
-				kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0];
+				kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0] - alphaUB;
 			kD2_RHS = ceil(kD1_RHS/inst.f_max_jt[i-1][0]);
 			kD1_RHS = ceil(kD1_RHS/inst.maxCapacity);
 			
