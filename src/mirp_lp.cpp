@@ -49,62 +49,70 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	f = IloArray<NumVarMatrix> (env, V);
 	fX = IloArray<IloArray<NumVarMatrix> >(env, V);
 	fOA = IloArray<NumVarMatrix> (env, V);
+	#ifndef WaitAfterOperate
 	fOB = IloArray<NumVarMatrix> (env, V);
-	fW = IloArray<NumVarMatrix> (env, V);		
-	
+	#endif
+	fW = IloArray<NumVarMatrix> (env, V);
+
 	hasArc = IloArray<IloArray<IloArray<IloIntArray> > >(env, V);
 	arcCost = IloArray<IloArray<IloArray<IloNumArray> > >(env, V);
 	hasEnteringArc1st = IloArray<IloArray<IloIntArray> >(env, V);
 	
 	x = IloArray<IloArray<IloArray<IloBoolVarArray> > >(env, V);
 	z = IloArray<IloArray<IloBoolVarArray> >(env,V);
+	#ifndef WaitAfterOperate
 	oA = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	oB = IloArray<IloArray<IloBoolVarArray> >(env,V);
+	#endif
 	w = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	
 	#ifdef WaitAfterOperate
-	fWB = IloArray<NumVarMatrix> (env, V);	
+	fWB = IloArray<NumVarMatrix> (env, V);
 	wB = IloArray<IloArray<IloBoolVarArray> >(env,V);
 	#endif
 	
 	//Additional variables for branching
-	#ifndef NBranching		
+	#ifndef NBranching
 	#endif
 	
 	for(v=0;v<V;v++){
 		f[v] = NumVarMatrix(env,N);
 		fX[v] = IloArray<NumVarMatrix>(env,N);
 		fOA[v] = NumVarMatrix(env,N);
+		#ifndef WaitAfterOperate
 		fOB[v] = NumVarMatrix(env,N);
-		fW[v] = NumVarMatrix(env,N);				
+		#endif
+		fW[v] = NumVarMatrix(env,N);
 		
 		z[v] = IloArray<IloBoolVarArray>(env,N);
+		#ifndef WaitAfterOperate
 		oA[v] = IloArray<IloBoolVarArray>(env,N);
 		oB[v] = IloArray<IloBoolVarArray>(env,N);
-		w[v] = IloArray<IloBoolVarArray>(env,N);		
-		x[v] = IloArray<IloArray<IloBoolVarArray> >(env, N);	
+		#endif
+		w[v] = IloArray<IloBoolVarArray>(env,N);
+		x[v] = IloArray<IloArray<IloBoolVarArray> >(env, N);
 					
-		hasArc[v] = IloArray<IloArray<IloIntArray> >(env, N);				
+		hasArc[v] = IloArray<IloArray<IloIntArray> >(env, N);
 		arcCost[v] = IloArray<IloArray<IloNumArray> >(env, N);
 		hasEnteringArc1st[v] = IloArray<IloIntArray>(env, N);
 		
 		#ifdef WaitAfterOperate
-		fWB[v] = NumVarMatrix(env,N);		
+		fWB[v] = NumVarMatrix(env,N);
 		wB[v] = IloArray<IloBoolVarArray>(env,N);
-		#endif	
-				
-		for(j=0;j<N;j++){			
+		#endif
+
+		for(j=0;j<N;j++){
 			x[v][j] = IloArray<IloBoolVarArray>(env,N);
 			hasArc[v][j] = IloArray<IloIntArray>(env,N);
-			arcCost[v][j] = IloArray<IloNumArray>(env,N);			
+			arcCost[v][j] = IloArray<IloNumArray>(env,N);
 			fX[v][j] = IloArray<IloNumVarArray>(env, N);
-			for(i=0;i<N;i++){				
-				x[v][j][i] = IloBoolVarArray(env,T);				
+			for(i=0;i<N;i++){
+				x[v][j][i] = IloBoolVarArray(env,T);
 				hasArc[v][j][i] = IloIntArray(env,T);
 				arcCost[v][j][i] = IloNumArray(env,T);
 				fX[v][j][i] = IloNumVarArray(env, T);
-				for(t=0;t<T;t++){				
-					stringstream ss;			
+				for(t=0;t<T;t++){
+					stringstream ss;
 					ss << "x_"<<v<<","<<j<<","<<i<<","<<t;
 					x[v][j][i][t].setName(ss.str().c_str());
 					ss.str(string());
@@ -119,12 +127,16 @@ void Model::buildModel(IloEnv& env, Instance inst){
 			if(j>0 && j<=J){ //Only considering Ports
 				f[v][j] = IloNumVarArray(env, T);
 				fOA[v][j] = IloNumVarArray(env, T);
+				#ifndef WaitAfterOperate
 				fOB[v][j] = IloNumVarArray(env, T);
+				#endif
 				fW[v][j] = IloNumVarArray(env, T);
 				
 				z[v][j] = IloBoolVarArray(env, T);
+				#ifndef WaitAfterOperate
 				oA[v][j] = IloBoolVarArray(env, T);
 				oB[v][j] = IloBoolVarArray(env, T);
+				#endif
 				w[v][j] = IloBoolVarArray(env, T);
 				
 				hasEnteringArc1st[v][j] = IloIntArray(env,T);
@@ -133,20 +145,22 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				fWB[v][j] = IloNumVarArray(env, T);
 				#endif
 				
-				for(t=1;t<T;t++){				
+				for(t=1;t<T;t++){
 					stringstream ss;
 					ss << "f_(" << j << "," << t << ")," << v;
 					int maxAmountOperation = min(inst.q_v[v], inst.f_max_jt[j-1][t-1]);
-					f[v][j][t] = IloNumVar(env, 0, maxAmountOperation, ss.str().c_str());								
+					f[v][j][t] = IloNumVar(env, 0, maxAmountOperation, ss.str().c_str());
 					ss.str(string());
 					ss << "fOA_(" << j << "," << t << ")," << v;
 					fOA[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
 					ss.str(string());
 					ss << "z_(" << j << "," << t << ")," << v;
 					z[v][j][t].setName(ss.str().c_str());
+					#ifndef WaitAfterOperate
 					ss.str(string());
 					ss << "oA_(" << j << "," << t << ")," << v;
-					oA[v][j][t].setName(ss.str().c_str());	
+					oA[v][j][t].setName(ss.str().c_str());
+					#endif
 					#ifndef NRelaxation
 					IloConversion convZ(env,z[v][j][t], ILOFLOAT);
 					model.add(convZ);
@@ -154,28 +168,34 @@ void Model::buildModel(IloEnv& env, Instance inst){
 					model.add(convOA);
 					#endif 				
 					if(t<T-1){ //Variables that haven't last time index
+						#ifndef WaitAfterOperate
 						ss.str(string());
 						ss << "fOB_(" << j << "," << t << ")," << v;
 						fOB[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
+						#endif
 						ss.str(string());
 						ss << "fW_(" << j << "," << t << ")," << v;
 						fW[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
+						#ifndef WaitAfterOperate
 						ss.str(string());
 						ss << "oB_(" << j << "," << t << ")," << v;
 						oB[v][j][t].setName(ss.str().c_str());
+						#endif
 						ss.str(string());
 						ss << "w_(" << j << "," << t << ")," << v;
 						w[v][j][t].setName(ss.str().c_str());
 						#ifndef NRelaxation
 						IloConversion convW(env,w[v][j][t], ILOFLOAT);
 						model.add(convW);
-						IloConversion convOB(env,oB[v][j][t], ILOFLOAT);
-						model.add(convOB);
+							#ifndef WaitAfterOperate
+							IloConversion convOB(env,oB[v][j][t], ILOFLOAT);
+							model.add(convOB);
+							#endif
 						#endif
 						#ifdef WaitAfterOperate
 							ss.str(string());
 							ss << "wB_(" << j << "," << t << ")," << v;
-							wB[v][j][t].setName(ss.str().c_str());					
+							wB[v][j][t].setName(ss.str().c_str());
 							ss.str(string());
 							ss << "fWB_(" << j << "," << t << ")," << v;
 							fWB[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
@@ -184,20 +204,20 @@ void Model::buildModel(IloEnv& env, Instance inst){
 							model.add(convWB);
 							#endif
 						#endif
-					}									
-				}		
-			}	
+					}
+				}
+			}
 		}
 	}
 
-	for(i=1;i<N-1;i++){		
-		alpha[i] = IloNumVarArray(env,T);		
-		sP[i] = IloNumVarArray(env, T);		
+	for(i=1;i<N-1;i++){
+		alpha[i] = IloNumVarArray(env,T);
+		sP[i] = IloNumVarArray(env, T);	
 		for(t=0;t<T;t++){
-			stringstream ss;						
-			if (t == 0){								
+			stringstream ss;
+			if (t == 0){
 				ss << "sP_(" << i << ",0)";
-				sP[i][t] = IloNumVar(env,inst.s_j0[i-1], inst.s_j0[i-1], ss.str().c_str()); //Initial inventory		
+				sP[i][t] = IloNumVar(env,inst.s_j0[i-1], inst.s_j0[i-1], ss.str().c_str()); //Initial inventory
 			}else{
 				ss.str(string());
 				ss << "sP_(" << i << "," << t << ")";				
@@ -206,8 +226,8 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				ss.str(string());
 				ss << "alpha_(" << i << "," << t << ")";
 				alpha[i][t] = IloNumVar(env, 0, inst.alp_max_jt[i-1][t-1], ss.str().c_str());
-			}			
-		}		
+			}
+		}
 	}
 	
 	///Objective function
@@ -237,18 +257,16 @@ void Model::buildModel(IloEnv& env, Instance inst){
 							arc_cost = inst.costKm[v]*inst.distanceMatrix[i-1][j-1] + inst.portFee[j-1];
 						}
 						hasArc[v][i][j][t] = 1;	
-						//~ cout << v << " " << i << " " << j << " " << t << "=" << hasArc[v][i][j][t] << endl;
 						arcCost[v][i][j][t] = arc_cost;
 						hasEnteringArc1st[v][j][t2] = 1;
 						if (t2+1<T-1) 			//Waiting arc 
 							hasEnteringArc1st[v][j][t2+1] = 1;
-							
 						expr1 += arc_cost*x[v][i][j][t];
-												
+
 						//Sink arc from port j 
 						hasArc[v][j][N-1][t2] = 1;
 						arcCost[v][j][N-1][t2] = -(T-t2-1)*inst.perPeriodRewardForFinishingEarly;
-						expr1 += arcCost[v][j][N-1][t2]*x[v][j][N-1][t2];						
+						expr1 += arcCost[v][j][N-1][t2]*x[v][j][N-1][t2];
 						//when the time t reach a time that can be built a mirror between j and i
 						if (t >= inst.firstTimeAv[v]+1 + inst.travelTime[v][i-1][j-1]){ //+1 for the data convert 
 							if (inst.typePort[j-1]==1 && inst.typePort[i-1]==0){ 		  //If port j is consuming and i is a producer port
@@ -277,7 +295,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 									hasEnteringArc1st[v][j2][t3] = 1;
 								}
 							}
-						}						
+						}
 					}
 				}
 			}
@@ -311,7 +329,6 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	///Constraints
 	//Flow balance source and sink nodes
 	IloExpr expr_sinkFlow(env);
-	//~ IloExpr expr_sourceFlow;
 	sinkNodeBalance = IloRangeArray(env,V,1,1); 
 	sourceNodeBalance = IloRangeArray(env,V,1,1);
 	//First level balance
@@ -327,7 +344,9 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	secondLevelFlow = IloArray<IloArray<IloRangeArray> > (env, V);
 	
 	//Link betwenn 1st and 2nd level
+	#ifndef WaitAfterOperate
 	linkBalance = IloArray<IloArray<IloRangeArray> > (env, V);
+	#endif
 	
 	//Berth Limit
 	berthLimit = IloArray<IloRangeArray>(env, N-1);		//Index 0 ignored
@@ -352,9 +371,10 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	//Flow limits
 	flowCapacityX = IloArray<IloArray<IloArray<IloRangeArray> > > (env,V);
 	flowCapacityOA = IloArray<IloArray<IloRangeArray> >(env,V);
-	flowCapacityOB = IloArray<IloArray<IloRangeArray> >(env,V);
 	flowCapacityW = IloArray<IloArray<IloRangeArray> >(env,V);
-	
+	#ifndef WaitAfterOperate
+	flowCapacityOB = IloArray<IloArray<IloRangeArray> >(env,V);
+	#endif
 	#ifdef WaitAfterOperate
 	flowCapacityWB = IloArray<IloArray<IloRangeArray> >(env,V);
 	#endif
@@ -364,7 +384,9 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	knapsack_P_2 = IloArray<IloRangeArray> (env, J+1);	
 	knapsack_D_1 = IloArray<IloRangeArray> (env, J+1);	
 	knapsack_D_2 = IloArray<IloRangeArray> (env, J+1);	
+	#ifndef WaitAfterOperate
 	knapsack_D_3 = IloArray<IloRangeArray> (env, J+1);	
+	#endif
 	#endif
 	
 	for(i=1;i<N-1;i++){
@@ -379,17 +401,19 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		}else{							//Discharging port
 			knapsack_D_1[i] = IloRangeArray(env, (T-3)*2);
 			knapsack_D_2[i] = IloRangeArray(env, (T-3)*2);
+			#ifndef WaitAfterOperate
 			knapsack_D_3[i] = IloRangeArray(env, (T-3)*2);
+			#endif
 		}
 		int it,k,l;
-		IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);					
+		IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);
 		for(it=0;it<(T-3)*2;it++){	//For each valid inequality
 			double kP1_RHS=0, kP2_RHS=0, kD1_RHS=0, kD2_RHS=0, sum_alphaMax=0, alphaUB=0;
 			expr_kP1_LHS.clear();
 			expr_kP2_LHS.clear();
 			expr_kD1_LHS.clear();
-			expr_kD2_LHS.clear();			
-			//Definining the size of set T =[k,l] - CAUTION: It is inverse of the paper of Agra et al (2013)
+			expr_kD2_LHS.clear();
+			//Defining the size of set T =[k,l] - CAUTION: It is inverse of the paper of Agra et al (2013)
 			k=1;
 			l=T-1;
 			if(it<T-3)
@@ -398,33 +422,40 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				k = it+4-l;
 			for(v=0;v<V;v++){
 				#ifdef WaitAfterOperate
-				expr_kP1_LHS += oB[v][i][k] + wB[v][i][k];
+				expr_kP1_LHS += wB[v][i][l];
 				if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
-					expr_kD1_LHS += w[v][i][k-1] + wB[v][i][k-1] + oB[v][i][k-1];
+					expr_kD1_LHS += w[v][i][k-1] + wB[v][i][k-1];
 				#endif
 				
 				#ifndef WaitAfterOperate
-				expr_kP1_LHS += oB[v][i][k];
+				expr_kP1_LHS += oB[v][i][l];
 				if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
 					expr_kD1_LHS += w[v][i][k-1] + oB[v][i][k-1];
 				#endif
+				#ifndef WaitAfterOperate
 				if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
 					expr_kD2_LHS += oB[v][i][k-1];
+				#endif
 				for(t=k;t<=l;t++){
 					expr_kP2_LHS += z[v][i][t];	//It is used for both loading and discharging ports
+					#ifndef WaitAfterOperate
 					expr_kD2_LHS += oA[v][i][t];
+					#endif
+					#ifdef WaitAfterOperate
+					expr_kD2_LHS += z[v][i][t];
+					#endif
 					for(j=0;j<N;j++){						
 						if(j==0 && inst.initialPort[v]+1 == i && t==inst.firstTimeAv[v]+1) 	//Source arc
 							expr_kD1_LHS += x[v][j][i][0];								
 						else if (j == N-1 && hasArc[v][i][j][t] == 1)						//Sink arc
 							expr_kP1_LHS += x[v][i][j][t];
-						else if (j > 0 && j<N-1){											//"Normal" arcs							 																
+						else if (j > 0 && j<N-1){											//"Normal" arcs	
 							if(i != j){
 								if(hasArc[v][i][j][t] == 1)
 									expr_kP1_LHS += x[v][i][j][t];
 								if(t - inst.travelTime[v][j-1][i-1] >= 0){					//Only if it is possible an entering arc due the travel time
 									if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1)
-										expr_kD1_LHS += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];										
+										expr_kD1_LHS += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
 								}
 							}
 						}
@@ -433,7 +464,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 			}
 			for(t=k;t<=l;t++){
 				//~ sum_alphaMax += inst.alp_max_jt[i-1][t-1];
-				kP1_RHS += inst.d_jt[i-1][t-1];				
+				kP1_RHS += inst.d_jt[i-1][t-1];	
 				kD1_RHS += inst.d_jt[i-1][t-1];
 			}
 			//~ alphaUB = min(sum_alphaMax, inst.alp_max_j[i-1]);
@@ -459,8 +490,10 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				knapsack_D_1[i][it] = IloRange(env, kD1_RHS, expr_kD1_LHS, IloInfinity, ss.str().c_str());
 				ss1 << "knpasackD2_" << i << "," << it;
 				knapsack_D_2[i][it] = IloRange(env, kD1_RHS, expr_kD2_LHS, IloInfinity, ss1.str().c_str());
+				#ifndef WaitAfterOperate
 				ss2 << "knpasackD3_" << i << "," << it;
 				knapsack_D_3[i][it] = IloRange(env, kD2_RHS, expr_kP2_LHS, IloInfinity, ss2.str().c_str());
+				#endif
 			}
 		}
 		if(inst.typePort[i-1] == 0){
@@ -469,7 +502,9 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		}else{
 			model.add(knapsack_D_1[i]);
 			model.add(knapsack_D_2[i]);
+			#ifndef WaitAfterOperate
 			model.add(knapsack_D_3[i]);
+			#endif
 		}		
 		#endif
 		
@@ -485,7 +520,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 					emptyExpr = false;
 				}
 				expr_invBalancePort += -f[v][i][t];
-			}			
+			}
 			if(!emptyExpr){ //Only if there are some Z variable in the expr
 				berthLimit[i][t] = IloRange(env,-IloInfinity, expr_berth, inst.b_j[i-1], ss.str().c_str());									
 				model.add(berthLimit[i][t]);
@@ -498,26 +533,24 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
 				inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
 			model.add(portInventory[i][t]);
-			
-		}		
+		}
 		ss1 << "cum_slack("<<i<<")";
 		cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
 		model.add(cumSlack[i]);
-		
-	}	
-	
+	}
 	expr_cumSlack.end();
 	expr_berth.end();
 	expr_invBalancePort.end();
 	
 	for(v=0;v<V;v++){
 		expr_sinkFlow.clear();		
-						
-		firstLevelBalance[v] = IloArray<IloRangeArray>(env,J+1); //Only for ports - id 0 not used		
+		firstLevelBalance[v] = IloArray<IloRangeArray>(env,J+1); //Only for ports - id 0 not used
 		firstLevelFlow[v] = IloArray<IloRangeArray>(env,J+1); 
 		secondLevelBalance[v] = IloArray<IloRangeArray>(env,J+1); 
 		secondLevelFlow[v] = IloArray<IloRangeArray>(env,J+1); 
+		#ifndef WaitAfterOperate
 		linkBalance[v] = IloArray<IloRangeArray>(env,J+1); 
+		#endif
 		
 		travelAtCapacity[v] = IloArray<IloArray<IloRangeArray> > (env, N-1);
 		travelEmpty[v] = IloArray<IloArray<IloRangeArray> > (env, N-1);
@@ -527,7 +560,9 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		
 		flowCapacityX[v] = IloArray<IloArray<IloRangeArray> >(env,N);
 		flowCapacityOA[v] = IloArray<IloRangeArray> (env,N-1);
+		#ifndef WaitAfterOperate
 		flowCapacityOB[v] = IloArray<IloRangeArray> (env,N-1);
+		#endif
 		flowCapacityW[v] = IloArray<IloRangeArray> (env,N-1);
 		#ifdef WaitAfterOperate
 		flowCapacityWB[v] = IloArray<IloRangeArray> (env,N-1);
@@ -539,8 +574,9 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				secondLevelBalance[v][i] = IloRangeArray(env,T,0,0); 
 				firstLevelFlow[v][i] = IloRangeArray(env,T,0,0); 
 				secondLevelFlow[v][i] = IloRangeArray(env,T,0,0); 
+				#ifndef WaitAfterOperate
 				linkBalance[v][i] = IloRangeArray(env,T,0,0); 
-				
+				#endif
 				travelAtCapacity[v][i] = IloArray<IloRangeArray> (env, N);
 				travelEmpty[v][i] = IloArray<IloRangeArray> (env, N);
 				
@@ -576,12 +612,13 @@ void Model::buildModel(IloEnv& env, Instance inst){
 							}
 							model.add(travelAtCapacity[v][i][j][t]);
 							model.add(travelEmpty[v][i][j][t]);
-						}						
+						}
 					}
 				}
-				
 				flowCapacityOA[v][i] = IloRangeArray(env,T);
+				#ifndef WaitAfterOperate
 				flowCapacityOB[v][i] = IloRangeArray(env,T);
+				#endif
 				flowCapacityW[v][i] = IloRangeArray(env,T);
 				#ifdef WaitAfterOperate
 				flowCapacityWB[v][i] = IloRangeArray(env,T);
@@ -602,147 +639,159 @@ void Model::buildModel(IloEnv& env, Instance inst){
 					expr_1stFlow.clear();
 					expr_2ndLevel.clear();
 					expr_2ndFlow.clear();
-										
-					//~ if(hasEnteringArc1st[v][i][t]==1){
-						for(j=0;j<N;j++){
-							if(j<N-1){ //No consider sink arc (first level balance)
-								//If j is the source node and reach i in time t
-								if(j==0 && inst.initialPort[v]+1 == i && t==inst.firstTimeAv[v]+1){
-									expr_1stLevel += x[v][j][i][0];							
-									expr_1stFlow += fX[v][j][i][0];
-									fX[v][j][i][0].setBounds(inst.s_v0[v], inst.s_v0[v]); //Fixing initial inventory 
-									//~ break; //If is the entering arc of vessel, there is no other arc entering port i for vessel v
-								}
-								else if (j>0){ //When j is a port
-									if (t - inst.travelTime[v][j-1][i-1] >= 0){ //If is possible to exist an arc from j to i										
-										if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1){ //If the arc exists
-											expr_1stLevel += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];									
-											expr_1stFlow += fX[v][j][i][t-inst.travelTime[v][j-1][i-1]];
-										}
+
+					for(j=0;j<N;j++){
+						if(j<N-1){ //No consider sink arc (first level balance)
+							//If j is the source node and reach i in time t
+							if(j==0 && inst.initialPort[v]+1 == i && t==inst.firstTimeAv[v]+1){
+								expr_1stLevel += x[v][j][i][0];
+								expr_1stFlow += fX[v][j][i][0];
+								fX[v][j][i][0].setBounds(inst.s_v0[v], inst.s_v0[v]); //Fixing initial inventory 								
+							}
+							else if (j>0){ //When j is a port
+								if (t - inst.travelTime[v][j-1][i-1] >= 0){ //If is possible to exist an arc from j to i
+									if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1){ //If the arc exists
+										expr_1stLevel += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
+										expr_1stFlow += fX[v][j][i][t-inst.travelTime[v][j-1][i-1]];
 									}
 								}
 							}
-							if(j>0){ //No consider source arc (second level balance)
-								//~ cout << v << " " << i << " " << j << " " << t << " " << hasArc[v][i][j][t] << endl;
-								if (hasArc[v][i][j][t] == 1){
-									//~ cout << v << " " << i << " " << j << " " << t << endl;
-									expr_2ndLevel += x[v][i][j][t];
-									expr_2ndFlow += fX[v][i][j][t];
-								}
+						}
+						if(j>0){ //No consider source arc (second level balance)
+							if (hasArc[v][i][j][t] == 1){
+								expr_2ndLevel += x[v][i][j][t];
+								expr_2ndFlow += fX[v][i][j][t];
 							}
-						}						
-						IloExpr expr_link;
-						#ifndef WaitAfterOperate						
-						if (t==1 || hasEnteringArc1st[v][i][t-1]==0){ //First time period or not entering arc in the previous time period
-							expr_1stLevel += - w[v][i][t] - oA[v][i][t];							
-							expr_2ndLevel += -oA[v][i][t] + oB[v][i][t];							
-							//~ secondLevelBalance[v][i][t].setExpr(oA[v][i][t]-oB[v][i][t] - expr_2ndLevel);
-							expr_link = oA[v][i][t] - z[v][i][t];							
-							expr_1stFlow+= -fW[v][i][t] - fOA[v][i][t];							
-							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t];
-						}else if (t==T-1){ //Last time period
-							expr_1stLevel += w[v][i][t-1] - oA[v][i][t];							
+						}
+					}
+					IloExpr expr_link;
+					#ifndef WaitAfterOperate
+					if (t==1 || (hasEnteringArc1st[v][i][t-1]==0 && t<T-1)){ //First time period or not entering arc in the previous time period
+						expr_1stLevel += - w[v][i][t] - oA[v][i][t];
+						expr_2ndLevel += -oA[v][i][t] + oB[v][i][t];
+						expr_link = oA[v][i][t] - z[v][i][t];
+						expr_1stFlow+= -fW[v][i][t] - fOA[v][i][t];
+						expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t];
+					}else if (t==T-1){ //Last time period
+						if (hasEnteringArc1st[v][i][t-1]==1){
+							expr_1stLevel += w[v][i][t-1] - oA[v][i][t];
 							expr_2ndLevel += -oA[v][i][t] -oB[v][i][t-1];
-							expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];
+							expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];   
 							expr_1stFlow += fW[v][i][t-1] - fOA[v][i][t];
 							expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t];
-						}else{ //Other times
-							expr_1stLevel += w[v][i][t-1] - w[v][i][t] - oA[v][i][t];
-							expr_2ndLevel += - oA[v][i][t] - oB[v][i][t-1] + oB[v][i][t];
-							//~ secondLevelBalance[v][i][t].setExpr(oA[v][i][t] + oB[v][i][t-1] - oB[v][i][t] - expr_2ndLevel);					
-							expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];
-							expr_1stFlow += fW[v][i][t-1] - fW[v][i][t] - fOA[v][i][t];
-							expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t];
-							//~ secondLevelFlow[v][i][t].setExpr(fOA[v][i][t] + fOB[v][i][t-1] + inst.delta[i-1]*f[v][i][t] -fOB[v][i][t] - expr_2ndFlow);
+						}else{
+							expr_1stLevel += - oA[v][i][t];
+							expr_2ndLevel += -oA[v][i][t];
+							expr_link = oA[v][i][t] - z[v][i][t];   
+							expr_1stFlow += - fOA[v][i][t];
+							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t];
 						}
-						#endif
-						#ifdef WaitAfterOperate						
-						if (t==1 || hasEnteringArc1st[v][i][t-1]==0){ //First time period or not entering arc in the previous time period
-							expr_1stLevel += - w[v][i][t] - oA[v][i][t];
-							expr_2ndLevel += -oA[v][i][t] + oB[v][i][t] + wB[v][i][t];
-							expr_link = oA[v][i][t] - z[v][i][t];							
-							expr_1stFlow+= -fW[v][i][t] - fOA[v][i][t];							
-							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t] + fWB[v][i][t];
-						}else if (t==T-1){ //Last time period
-							expr_1stLevel += w[v][i][t-1] - oA[v][i][t] + wB[v][i][t-1];
-							expr_2ndLevel += -oA[v][i][t] -oB[v][i][t-1];
-							expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];
-							expr_1stFlow += fW[v][i][t-1] - fOA[v][i][t] + fWB[v][i][t-1];
-							expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t];
-						}else{ //Other times
-							expr_1stLevel += w[v][i][t-1] - w[v][i][t] - oA[v][i][t] + wB[v][i][t-1];
-							expr_2ndLevel += - oA[v][i][t] - oB[v][i][t-1] + oB[v][i][t] + wB[v][i][t];							
-							expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];
-							expr_1stFlow += fW[v][i][t-1] - fW[v][i][t] - fOA[v][i][t] + fWB[v][i][t-1];
-							expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t] + fWB[v][i][t];
+					}else{ //Other times
+						expr_1stLevel += w[v][i][t-1] - w[v][i][t] - oA[v][i][t];
+						expr_2ndLevel += - oA[v][i][t] - oB[v][i][t-1] + oB[v][i][t];
+						expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];
+						expr_1stFlow += fW[v][i][t-1] - fW[v][i][t] - fOA[v][i][t];
+						expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t];
+					}
+					#endif
+					#ifdef WaitAfterOperate						
+					if (t==1 || (hasEnteringArc1st[v][i][t-1]==0 && t<T-1)){ //First time period or not entering arc in the previous time period
+						expr_1stLevel += - w[v][i][t] - z[v][i][t];
+						expr_2ndLevel += -z[v][i][t] + wB[v][i][t];						
+						expr_1stFlow+= -fW[v][i][t] - fOA[v][i][t];							
+						expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fWB[v][i][t];
+					}else if (t==T-1){ //Last time period
+						if (hasEnteringArc1st[v][i][t-1]==1){
+							expr_1stLevel += w[v][i][t-1] - z[v][i][t] + wB[v][i][t-1];                                
+							expr_1stFlow += fW[v][i][t-1] - fOA[v][i][t] + fWB[v][i][t-1];                                
+						}else{
+							expr_1stLevel += - z[v][i][t];                                
+							expr_1stFlow += - fOA[v][i][t];                                
 						}
-						#endif
-						
-						firstLevelBalance[v][i][t].setExpr(expr_1stLevel);
-						secondLevelBalance[v][i][t].setExpr(expr_2ndLevel);
-						linkBalance[v][i][t].setExpr(expr_link);
-						firstLevelFlow[v][i][t].setExpr(expr_1stFlow);
-						secondLevelFlow[v][i][t].setExpr(expr_2ndFlow);
-						
-						firstLevelBalance[v][i][t].setName(ss.str().c_str());
-						model.add(firstLevelBalance[v][i][t]);
-						
-						secondLevelBalance[v][i][t].setName(ss1.str().c_str());
-						model.add(secondLevelBalance[v][i][t]);
-						
-						linkBalance[v][i][t].setName(ss2.str().c_str());
-						model.add(linkBalance[v][i][t]);
-						
-						firstLevelFlow[v][i][t].setName(ss3.str().c_str());
-						model.add(firstLevelFlow[v][i][t]);
-						
-						secondLevelFlow[v][i][t].setName(ss4.str().c_str());						
-						model.add(secondLevelFlow[v][i][t]);
+						expr_2ndLevel += -z[v][i][t];
+						expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t];
+					}else{ //Other times
+						expr_1stLevel += w[v][i][t-1] - w[v][i][t] - z[v][i][t] + wB[v][i][t-1];
+						expr_2ndLevel += - z[v][i][t] + wB[v][i][t];	
+						expr_1stFlow += fW[v][i][t-1] - fW[v][i][t] - fOA[v][i][t] + fWB[v][i][t-1];
+						expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fWB[v][i][t];
+					}
+					#endif
 					
+					firstLevelBalance[v][i][t].setExpr(expr_1stLevel);
+					secondLevelBalance[v][i][t].setExpr(expr_2ndLevel);
+					#ifndef WaitAfterOperate
+					linkBalance[v][i][t].setExpr(expr_link);
+					#endif
+					firstLevelFlow[v][i][t].setExpr(expr_1stFlow);
+					secondLevelFlow[v][i][t].setExpr(expr_2ndFlow);
 					
-						ss5 << "fjmin_(" << i << "," << t << ")," << v;
-						ss6 << "fjmax_(" << i << "," << t << ")," << v;
-						IloNum minfMax = min(inst.f_max_jt[i-1][t-1], inst.q_v[v]);
-						operationLowerLimit[v][i][t] = IloRange(env, 0, f[v][i][t] - inst.f_min_jt[i-1][t-1]*z[v][i][t] , IloInfinity, ss5.str().c_str());
-						model.add(operationLowerLimit[v][i][t]);
-						
-						operationUpperLimit[v][i][t] = IloRange(env, -IloInfinity, f[v][i][t] - minfMax*z[v][i][t],	0, ss6.str().c_str());				
-						model.add(operationUpperLimit[v][i][t]);
-						
-						ss7 << "flowLimitOA_"<<v<<","<<i<<","<<t;					
-						flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*oA[v][i][t], 0, ss7.str().c_str());					
-						model.add(flowCapacityOA[v][i][t]);					
-						
-						if(t<T-1){ //Constraints with no last time index
-							ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
-							ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;							
-							flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-inst.q_v[v]*oB[v][i][t], 0, ss8.str().c_str());
-							flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());							
-							model.add(flowCapacityOB[v][i][t]);
-							model.add(flowCapacityW[v][i][t]);
-							#ifdef WaitAfterOperate
-							ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
-							flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
-							model.add(flowCapacityWB[v][i][t]);
-							#endif							
-						}
-					//~ }
+					firstLevelBalance[v][i][t].setName(ss.str().c_str());
+					model.add(firstLevelBalance[v][i][t]);
+					
+					secondLevelBalance[v][i][t].setName(ss1.str().c_str());
+					model.add(secondLevelBalance[v][i][t]);
+					
+					#ifndef WaitAfterOperate
+					linkBalance[v][i][t].setName(ss2.str().c_str());
+					model.add(linkBalance[v][i][t]);
+					#endif
+					
+					firstLevelFlow[v][i][t].setName(ss3.str().c_str());
+					model.add(firstLevelFlow[v][i][t]);
+					
+					secondLevelFlow[v][i][t].setName(ss4.str().c_str());						
+					model.add(secondLevelFlow[v][i][t]);
+
+					ss5 << "fjmin_(" << i << "," << t << ")," << v;
+					ss6 << "fjmax_(" << i << "," << t << ")," << v;
+					IloNum minfMax = min(inst.f_max_jt[i-1][t-1], inst.q_v[v]);
+					operationLowerLimit[v][i][t] = IloRange(env, 0, f[v][i][t] - inst.f_min_jt[i-1][t-1]*z[v][i][t] , IloInfinity, ss5.str().c_str());
+					model.add(operationLowerLimit[v][i][t]);
+					
+					operationUpperLimit[v][i][t] = IloRange(env, -IloInfinity, f[v][i][t] - minfMax*z[v][i][t],	0, ss6.str().c_str());				
+					model.add(operationUpperLimit[v][i][t]);
+					
+					ss7 << "flowLimitOA_"<<v<<","<<i<<","<<t;					
+					#ifndef WaitAfterOperate
+					flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*oA[v][i][t], 0, ss7.str().c_str());					
+					#endif
+					#ifdef WaitAfterOperate
+					flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*z[v][i][t], 0, ss7.str().c_str());					
+					#endif
+					model.add(flowCapacityOA[v][i][t]);					
+					
+					if(t<T-1){ //Constraints with no last time index
+						#ifndef WaitAfterOperate
+						ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
+						flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-inst.q_v[v]*oB[v][i][t], 0, ss8.str().c_str());
+						model.add(flowCapacityOB[v][i][t]);
+						#endif
+						ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
+						flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());							
+						model.add(flowCapacityW[v][i][t]);
+						#ifdef WaitAfterOperate
+						ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
+						flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
+						model.add(flowCapacityWB[v][i][t]);
+						#endif							
+					}
 				}				
 			
-			}			
-			flowCapacityX[v][i] = IloArray<IloRangeArray>(env,N);
-			for(j=0;j<N;j++){
-				if(i != j){
-					flowCapacityX[v][i][j] = IloRangeArray(env,T);
-					for(t=0;t<T;t++){
-						stringstream ss;
-						ss << "flowLimitX_" << v << "," << i << "," << j << "," << t;
-						flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss.str().c_str());
+						
+				flowCapacityX[v][i] = IloArray<IloRangeArray>(env,N);
+				for(j=1;j<N;j++){ //No arriving arc to source arc j=0
+					if(i != j && i < N-1){ //There is no departing arc from sink node
+						flowCapacityX[v][i][j] = IloRangeArray(env,T);
+						for(t=0;t<T;t++){
+							stringstream ss;
+							ss << "flowLimitX_" << v << "," << i << "," << j << "," << t;
+							flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss.str().c_str());
+						}
+						model.add(flowCapacityX[v][i][j]);
 					}
-					model.add(flowCapacityX[v][i][j]);
 				}
 			}
-		
 		}		
 		stringstream ss;
 		ss << "flowBalanceSink_" << v;
@@ -759,7 +808,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	
 	#ifndef NBranching
 		
-	#endif	
+	#endif
 	
 	#ifndef NValidInequalities
 	
@@ -781,20 +830,24 @@ void Model::printSolution(IloEnv env, Instance& inst){
 	int V = inst.speed.getSize(); //# of vessels
 	int N = J + 2; // Number of nodes including source and sink. (0,1...j,j+1)
 	
-	double costArc, revenue, costSpot, costAtempt;
+	double costArc, revenue, costSpot, costAtempt, 
+    costArc2, revenue2;
 	
 	//Store binary variables
-	xValue = IloArray<IloArray<IloArray<IloNumArray> > >(env,V) ;
+	xValue = IloArray<IloArray<IloArray<IloNumArray> > >(env,V);
 	zValue = IloArray<IloArray<IloNumArray> >(env,V);
 	wValue = IloArray<IloArray<IloNumArray> >(env,V);
 	oAValue = IloArray<IloArray<IloNumArray> >(env,V);
 	oBValue = IloArray<IloArray<IloNumArray> > (env,V);
+	wBValue = IloArray<IloArray<IloNumArray> > (env,V);
+    
 	//Store fractional variables
 	fValue = IloArray<IloArray<IloNumArray> >(env,V);
 	fXValue = IloArray<IloArray<IloArray<IloNumArray> > >(env,V);
 	foAValue = IloArray<IloArray<IloNumArray> > (env,V);
 	foBValue = IloArray<IloArray<IloNumArray> >(env,V);
 	fWValue = IloArray<IloArray<IloNumArray> >(env,V);
+	fWBValue = IloArray<IloArray<IloNumArray> >(env,V);
 	sPValue = IloArray<IloNumArray>(env,N-1);
 	alphaValue = IloArray<IloNumArray>(env,N-1);
 	
@@ -802,6 +855,7 @@ void Model::printSolution(IloEnv env, Instance& inst){
 		xValue[v] = IloArray<IloArray<IloNumArray>>(env, N);
 		zValue[v] = IloArray<IloNumArray>(env,N-1);
 		wValue[v] = IloArray<IloNumArray>(env,N-1);
+		wBValue[v] = IloArray<IloNumArray>(env,N-1);
 		oAValue[v] = IloArray<IloNumArray>(env,N-1);
 		oBValue[v] = IloArray<IloNumArray>(env,N-1);
 		
@@ -809,12 +863,13 @@ void Model::printSolution(IloEnv env, Instance& inst){
 		fValue[v] = IloArray<IloNumArray>(env,N-1);
 		foAValue[v] = IloArray<IloNumArray>(env,N-1);
 		foBValue[v] = IloArray<IloNumArray>(env,N-1);
-		fWValue[v] = IloArray<IloNumArray>(env,N-1);		
-		
+		fWValue[v] = IloArray<IloNumArray>(env,N-1);
+		fWBValue[v] = IloArray<IloNumArray>(env,N-1);
 		for (i=0;i<N;i++){
 			if(i > 0 && i < N-1){ //Not consider sink node
 				zValue[v][i] = IloNumArray(env,T);
 				wValue[v][i] = IloNumArray(env,T);
+				wBValue[v][i] = IloNumArray(env,T);
 				oAValue[v][i] = IloNumArray(env,T);
 				oBValue[v][i] = IloNumArray(env,T);
 				
@@ -822,26 +877,36 @@ void Model::printSolution(IloEnv env, Instance& inst){
 				foAValue[v][i] = IloNumArray(env,T);
 				foBValue[v][i] = IloNumArray(env,T);
 				fWValue[v][i] = IloNumArray(env,T);
+				fWBValue[v][i] = IloNumArray(env,T);
 				
 				for(t=1;t<T;t++){
+                    fValue[v][i][t] = cplex.getValue(f[v][i][t]);
+                    revenue2 += fValue[v][i][t]*inst.r_jt[i-1][t-1];
 					if(hasEnteringArc1st[v][i][t]){
-						zValue[v][i][t] = cplex.getValue(z[v][i][t]);					
+						zValue[v][i][t] = cplex.getValue(z[v][i][t]);
 						//~ cout << "Z value " << v << " " << i << " " << t << " " << zValue[v][i][t] << endl;
 						if(zValue[v][i][t]>=0.1)
 							costAtempt += (t-1)*inst.attemptCost;
+						#ifndef WaitAfterOperate
+						oAValue[v][i][t] = cplex.getValue(oA[v][i][t]);
+						#endif
 						
-						oAValue[v][i][t] = cplex.getValue(oA[v][i][t]);				
+						//~ fValue[v][i][t] = cplex.getValue(f[v][i][t]);
+						//~ if(zValue[v][i][t]>=0.1)
+						revenue += fValue[v][i][t]*inst.r_jt[i-1][t-1];
 						
-						fValue[v][i][t] = cplex.getValue(f[v][i][t]);
-						if(zValue[v][i][t]>=0.1)
-							revenue += fValue[v][i][t]*inst.r_jt[i-1][t-1];
-						
-						foAValue[v][i][t] = cplex.getValue(fOA[v][i][t]);						
+						foAValue[v][i][t] = cplex.getValue(fOA[v][i][t]);
 						if(t<T-1){ //Variables not associated with last time index
 							wValue[v][i][t] = cplex.getValue(w[v][i][t]);
-							oBValue[v][i][t] = cplex.getValue(oB[v][i][t]);							
-							foBValue[v][i][t] = cplex.getValue(fOB[v][i][t]);	
-							fWValue[v][i][t] = cplex.getValue(fW[v][i][t]);						
+							#ifndef WaitAfterOperate
+							oBValue[v][i][t] = cplex.getValue(oB[v][i][t]);	
+							foBValue[v][i][t] = cplex.getValue(fOB[v][i][t]);
+							#endif
+							fWValue[v][i][t] = cplex.getValue(fW[v][i][t]);	
+                            #ifdef WaitAfterOperate
+                            wBValue[v][i][t] = cplex.getValue(wB[v][i][t]);
+                            fWBValue[v][i][t] = cplex.getValue(fWB[v][i][t]);
+                            #endif
 						}
 					}
 				}
@@ -851,14 +916,15 @@ void Model::printSolution(IloEnv env, Instance& inst){
 			for(j=0;j<N;j++){
 				xValue[v][i][j] = IloNumArray(env,T);
 				fXValue[v][i][j] = IloNumArray(env,T);
-				for(t=0;t<T;t++){					
-					if(hasArc[v][i][j][t] == 1){ // Only if the arc exists
+				for(t=0;t<T;t++){
+                    if(hasArc[v][i][j][t] == 1){ // Only if the arc exists
 						xValue[v][i][j][t] = cplex.getValue(x[v][i][j][t]);
 						fXValue[v][i][j][t] = cplex.getValue(fX[v][i][j][t]);
 						if(xValue[v][i][j][t] >= 0.1){
 							costArc += arcCost[v][i][j][t];
-						}
-					}					
+                            costArc2 += xValue[v][i][j][t]*arcCost[v][i][j][t];
+						}                                                
+					}
 				}
 			}
 		}	
@@ -871,7 +937,7 @@ void Model::printSolution(IloEnv env, Instance& inst){
 			if(t>0){
 				alphaValue[i][t] = cplex.getValue(alpha[i][t]);
 				if (alphaValue[i][t] >= 0.1)
-					costSpot += inst.p_jt[i-1][t-1];
+					costSpot += inst.p_jt[i-1][t-1]*alphaValue[i][t];
 				//~ cout << "Port stock (" << i << "," << t << "): " << sPValue[i][t] << " Alpha: " << alphaValue[i][t] << endl;
 			}
 			//~ }else
@@ -896,31 +962,69 @@ void Model::printSolution(IloEnv env, Instance& inst){
 			}
 			if(i>0){
 				for(t=1;t<T;t++){
-					if(hasEnteringArc1st[v][i][t]){
-						if(t<T-1 && wValue[v][i][t] >= 0.1)						
-							cout << "Waiting in (" << i << "," << t << ") with load: " << fWValue[v][i][t] << endl;
+					//~ if(hasEnteringArc1st[v][i][t]){
+						#ifndef WaitAfterOperate
+                        if(t<T-1 && wValue[v][i][t] >= 0.1)
+                            cout << "Waiting in (" << i << "," << t << ") with load: " << fWValue[v][i][t] << endl;
+                        #endif
+                        #ifdef WaitAfterOperate
+                        if(t<T-1 && (wValue[v][i][t] >= 0.1 || wBValue[v][i][t] >= 0.1))
+                            cout << "Waiting in (" << i << "," << t << ") with load (w/wB): " << fWValue[v][i][t] << "/" << fWBValue[v][i][t] << endl;
+                        #endif
+							
 						if(zValue[v][i][t] >= 0.1){
 							if (t==1)
-								cout << "Operate at (" << i << "," << t << ") - oA= " << oAValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t] << endl;
+								#ifndef WaitAfterOperate
+                                cout << "Operate at (" << i << "," << t << ") - oA= " << oAValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t] << endl;
+                                #endif 
+                                #ifdef WaitAfterOperate
+                                cout << "Operate at (" << i << "," << t << ") - Z = " << zValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t] << endl;
+                                #endif
 							else{
+                                #ifndef WaitAfterOperate
 								cout << "Operate at (" << i << "," << t << ") - oA= " << oAValue[v][i][t] << "(" << foAValue[v][i][t] << ") oB= " << oBValue[v][i][t-1] << "(" << foBValue[v][i][t-1] << 
 								")- f= " << fValue[v][i][t] << endl;
+                                #endif
+                                #ifdef WaitAfterOperate
+                                cout << "Operate at (" << i << "," << t << ") - Z= " << zValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t] << endl;
+                                #endif
+                                
 							}
 						}else{
 							if (fValue[v][i][t] > 0.01)
 								cout << "Operated but not in node (" << i << "," << t << ")_" << v << ": "  << fValue[v][i][t] << endl;
 							assert(fValue[v][i][t] <= 0.01);
 						}
-					}
+					//~ }
 				}
 			}
 		}
 	}
+    for(i=1;i<=J;i++){
+        for(t=0;t<T;t++){
+            cout << "Port ("<<i<<","<<t<<") inventory: " << sPValue[i][t];
+            if (alphaValue[i][t] > 0.00001){                
+                if(inst.typePort[i-1] == 0)
+                    cout << " - Alpha:" << alphaValue[i][t];
+                else
+                    cout << " + Alpha:" << alphaValue[i][t];
+            }                
+            if (sPValue[i][t] > inst.sMax_jt[i-1][0] || sPValue[i][t] < inst.sMin_jt[i-1][0])
+                cout << "Inventory out of bounds!!!";
+            cout << endl;
+        }        
+        if(IloSum(alphaValue[i]) > inst.alp_max_j[i-1])
+            cout << "Cumulative spot market extrapoled ";
+        
+    }
 	cout << "Final value: " << costArc + costAtempt + costSpot - revenue << endl;
 	cout << "Arcs: " << costArc << endl <<
 			"Attempts: " << costAtempt << endl <<
 			"Spots: " << costSpot << endl <<
-			"Revenue: " << revenue << endl;
+			"Revenue: " << revenue << endl <<
+			" ----- " << endl << 
+            "Arcs2: " << costArc2 << endl <<
+            "Revenue2: " << revenue2 << endl;
 
 }
 void Model::setParameters(IloEnv& env, const double& timeLimit, const double& gap=1e-04){

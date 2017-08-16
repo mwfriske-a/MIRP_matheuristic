@@ -61,16 +61,17 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		
 		//Conversion - For relax-and-fix 
 		IloArray<IloArray<IloArray<IloArray<IloConversion> > > > convertX; //Convert x variables according [v][i][j][t]
-		IloArray<IloArray<IloArray<IloConversion> > > convertZ; //Convert z variables according to time ([v][i][t])		
+		IloArray<IloArray<IloArray<IloConversion> > > convertZ; //Convert z variables according to time ([v][i][t])
 		IloArray<IloArray<IloArray<IloConversion> > > convertW; //Convert w variables according to time ([v][i][t])
-		IloArray<IloArray<IloArray<IloConversion> > > convertWB; //Convert w variables according to time ([v][i][t])
-		IloArray<IloArray<IloArray<IloConversion> > > convertOA; //Convert w variables according to time ([v][i][t])
-		IloArray<IloArray<IloArray<IloConversion> > > convertOB; //Convert w variables according to time ([v][i][t])
+		IloArray<IloArray<IloArray<IloConversion> > > convertWB; //Convert wB variables according to time ([v][i][t])
+		IloArray<IloArray<IloArray<IloConversion> > > convertOA; //Convert oA variables according to time ([v][i][t])
+		IloArray<IloArray<IloArray<IloConversion> > > convertOB; //Convert oB variables according to time ([v][i][t])
 		
 		//Store variables values 
 		IloArray<IloArray<IloArray<IloNumArray> > > xValue;
 		IloArray<IloArray<IloNumArray> > zValue;
 		IloArray<IloArray<IloNumArray> > wValue;
+		IloArray<IloArray<IloNumArray> > wBValue;
 		IloArray<IloArray<IloNumArray> > oAValue;
 		IloArray<IloArray<IloNumArray> > oBValue;
 		
@@ -79,8 +80,9 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloArray<IloNumArray> > foAValue;
 		IloArray<IloArray<IloNumArray> > foBValue;
 		IloArray<IloArray<IloNumArray> > fWValue;
+		IloArray<IloArray<IloNumArray> > fWBValue;
 		IloArray<IloNumArray> sPValue;
-		IloArray<IloNumArray> alphaValue;		
+		IloArray<IloNumArray> alphaValue;
 
 		///Constraints
 		//Balance between nodes
@@ -94,7 +96,7 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloArray<IloRangeArray> > firstLevelFlow;
 		IloArray<IloArray<IloRangeArray> > secondLevelFlow;
 
-		IloArray<IloRangeArray> berthLimit;		
+		IloArray<IloRangeArray> berthLimit;
 		IloArray<IloArray<IloArray<IloRangeArray> > >  travelAtCapacity;
 		IloArray<IloArray<IloArray<IloRangeArray> > >  travelEmpty;
 		IloArray<IloRangeArray> portInventory;

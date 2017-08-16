@@ -94,7 +94,7 @@ while ((opt = getopt(argc,argv,"v:p:f:t:y:s:n:g:o:e:r:l:m:i:h:u:")) != EOF)
 		if (endBlock + 2 > ceil(nIntervals)) {
 			cout << "Error! Size of end block must be at leat 2 units less than the number of intervals)" << endl;
 		}
-		//~ mirp::fixAndRelax(file.str(), optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit);
+		mirp::fixAndRelax(file.str(), optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit);
 		break;
 	case 3:
 		//~ mirp::fixAndRelaxH(file.str(), optstr, gapFirst, outVessel, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond,overlap2);	
