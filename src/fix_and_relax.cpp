@@ -1004,11 +1004,10 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 			}
 		}
 	}
-
 	//Port-time iterator
 	for(i=1;i<=J;i++){
 		for(t=tS;t<=tF;t++){
-			expr_obj_cost += inst.p_jt[i-1][t-1]*alpha[i][t];										//4rd term
+			expr_obj_cost += inst.p_jt[i-1][t-1]*alpha[i][t];								//4rd term
 			#ifndef NBetas
             expr_obj_cost += 1000*beta[i][t];										//Auxiliary variables
             #endif
@@ -1241,28 +1240,30 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
                 expr_1stFlow.clear();
                 expr_2ndFlow.clear();
                 
-                expr_1stLevel = firstLevelBalance[v][i][tS-1].getExpr();
-                expr_2ndLevel = secondLevelBalance[v][i][tS-1].getExpr();
-                expr_1stFlow = firstLevelFlow[v][i][tS-1].getExpr();
-                expr_2ndFlow = secondLevelFlow[v][i][tS-1].getExpr();
-                
-                expr_1stLevel += - w[v][i][tS-1];
-                expr_1stFlow += -fW[v][i][tS-1];
-                
-                #ifndef WaitAfterOperate
-                expr_2ndLevel += oB[v][i][tS-1];
-                expr_2ndFlow += fOB[v][i][tS-1];
-                #endif
-                
-                #ifdef WaitAfterOperate
-                expr_2ndLevel += wB[v][i][tS-1];
-                expr_2ndFlow += fWB[v][i][tS-1];
-                #endif
-                
-                firstLevelBalance[v][i][tS-1].setExpr(expr_1stLevel);
-                firstLevelFlow[v][i][tS-1].setExpr(expr_1stFlow);
-                secondLevelBalance[v][i][tS-1].setExpr(expr_2ndLevel);
-                secondLevelFlow[v][i][tS-1].setExpr(expr_2ndFlow);
+                if(hasEnteringArc1st[v][i][tS-1]){ //Only necessary if there is entering arc in the node					
+					expr_1stLevel = firstLevelBalance[v][i][tS-1].getExpr();
+					expr_2ndLevel = secondLevelBalance[v][i][tS-1].getExpr();
+					expr_1stFlow = firstLevelFlow[v][i][tS-1].getExpr();
+					expr_2ndFlow = secondLevelFlow[v][i][tS-1].getExpr();
+					
+					expr_1stLevel += - w[v][i][tS-1];
+					expr_1stFlow += -fW[v][i][tS-1];
+					
+					#ifndef WaitAfterOperate                
+					expr_2ndLevel += oB[v][i][tS-1];
+					expr_2ndFlow += fOB[v][i][tS-1];
+					#endif
+					
+					#ifdef WaitAfterOperate
+					expr_2ndLevel += wB[v][i][tS-1];
+					expr_2ndFlow += fWB[v][i][tS-1];
+					#endif
+					
+					firstLevelBalance[v][i][tS-1].setExpr(expr_1stLevel);
+					firstLevelFlow[v][i][tS-1].setExpr(expr_1stFlow);
+					secondLevelBalance[v][i][tS-1].setExpr(expr_2ndLevel);
+					secondLevelFlow[v][i][tS-1].setExpr(expr_2ndFlow);
+				}
                 
                 //Add constraints on the flow variables of last time period of previous block.
                 stringstream ss8,ss9,ss10;
@@ -1550,7 +1551,7 @@ void Model::reIntegralize(IloEnv& env, Instance inst, const int& tS, const int& 
 					#ifndef WaitAfterOperate
 					model.remove(convertOA[v][i][t]);
                     #endif
-                    if(t+1<tF){
+                    if(t<tF){
                         model.remove(convertW[v][i][t]);
                         #ifndef WaitAfterOperate
                         model.remove(convertOB[v][i][t]);
@@ -1918,7 +1919,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 				cout << "Integralizing: [" << t1S << "," << t1F << "]\n";
 				model.reIntegralize(env, inst, t1S, t1F);                
             }
-            //~ model.cplex.exportModel("mip_R&F.lp");
+            model.cplex.exportModel("mip_R&F.lp");
             
             double newGap = max(0.001, (gapFirst - (gapFirst/ceil(T-sizeInterval/p))*v) / 100);
             cout << "New GAP " << newGap*100 << " %" << endl;

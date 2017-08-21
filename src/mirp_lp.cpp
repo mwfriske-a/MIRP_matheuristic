@@ -20,7 +20,8 @@
 //~ #define NTravelAtCapacity
 //~ #define NTravelEmpty
 //~ #define NBerthLimit
-#define NBranching
+//~ #define NBranchingX			//Branching rule on summing variable x
+#define NBranchingOA	//Branching rule on summing variable OA -- Only allowed when WaitAfterOperate is turned of
 #define NRelaxation
 #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
 //~ #define NKnapsackInequalities
@@ -72,8 +73,13 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	#endif
 	
 	//Additional variables for branching
-	#ifndef NBranching
+	#ifndef NBranchingX
+	sX = IloArray<IloIntVarArray>(env,V);
 	#endif
+	#ifndef NBranchingOA
+	sOA = IloArray<IloIntVarArray>(env,V);
+	#endif
+	
 	
 	for(v=0;v<V;v++){
 		f[v] = NumVarMatrix(env,N);
@@ -100,12 +106,34 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		fWB[v] = NumVarMatrix(env,N);
 		wB[v] = IloArray<IloBoolVarArray>(env,N);
 		#endif
+		
+		#ifndef NBranchingX
+		sX[v] = IloIntVarArray(env,J);
+		#endif
+		#ifndef NBranchingOA
+		sOA[v] = IloIntVarArray(env,J);
+		#endif
 
 		for(j=0;j<N;j++){
 			x[v][j] = IloArray<IloBoolVarArray>(env,N);
 			hasArc[v][j] = IloArray<IloIntArray>(env,N);
 			arcCost[v][j] = IloArray<IloNumArray>(env,N);
 			fX[v][j] = IloArray<IloNumVarArray>(env, N);
+			#ifndef NBranchingX
+			if(j<J){
+				stringstream ss;
+				ss << "sum_x" << v << "("<<j<<")";
+				sX[v][j] = IloIntVar(env,0,IloInfinity,ss.str().c_str());  //For these variables, the port-index starts in 0
+			}
+			#endif
+			#ifndef NBranchingOA
+			if(j<J){
+				stringstream ss;
+				ss << "sum_OA" << v << "("<<j<<")";
+				sOA[v][j] = IloIntVar(env,0,IloInfinity,ss.str().c_str());  //For these variables, the port-index starts in 0
+			}
+			#endif
+			
 			for(i=0;i<N;i++){
 				x[v][j][i] = IloBoolVarArray(env,T);
 				hasArc[v][j][i] = IloIntArray(env,T);
@@ -379,6 +407,14 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	flowCapacityWB = IloArray<IloArray<IloRangeArray> >(env,V);
 	#endif
 	
+	//Branching
+	#ifndef NBranchingX
+	branchingX = IloArray<IloRangeArray>(env,V);
+	#endif 
+	#ifndef NBranchingOA
+	branchingOA = IloArray<IloRangeArray>(env,V);
+	#endif 
+	
 	#ifndef NKnapsackInequalities
 	knapsack_P_1 = IloArray<IloRangeArray> (env, J+1);			//Altough created for all J ports, it is only considered for loading(production) or consumption(discharging) ports
 	knapsack_P_2 = IloArray<IloRangeArray> (env, J+1);	
@@ -568,6 +604,12 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		flowCapacityWB[v] = IloArray<IloRangeArray> (env,N-1);
 		#endif
 		
+		#ifndef NBranchingX
+		branchingX[v] = IloRangeArray(env,J);
+		#endif
+		#ifndef NBranchingOA
+		branchingOA[v] = IloRangeArray(env,J);
+		#endif
 		for(i=0;i<N;i++){
 			if(i>0 && i <= J){ //Only considering ports				
 				firstLevelBalance[v][i] = IloRangeArray(env,T,0,0); //Id 0 is not used				
@@ -582,6 +624,10 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				
 				operationLowerLimit[v][i] = IloRangeArray (env,T);
 				operationUpperLimit[v][i] = IloRangeArray (env,T);
+				
+				#ifndef NBranchingX
+				IloExpr expr_sumX(env);
+				#endif
 				
 				for(j=0;j<N;j++){
 					if(j>0){ //Considering ports and sink node
@@ -612,9 +658,24 @@ void Model::buildModel(IloEnv& env, Instance inst){
 							}
 							model.add(travelAtCapacity[v][i][j][t]);
 							model.add(travelEmpty[v][i][j][t]);
+							#ifndef NBranchingX
+							if(hasArc[v][i][j][t] == 1){
+								expr_sumX += x[v][i][j][t];
+							}
+							#endif
 						}
 					}
 				}
+				#ifndef NBranchingX
+				if(i<J){
+					stringstream sBr;
+					sBr << "branching_" << v << "("<<i<<")";
+					branchingX[v][i-1] = IloRange(env,0, sX[v][i-1] - expr_sumX,0,sBr.str().c_str());
+					model.add(branchingX[v][i-1]);
+					cplex.setPriority(sX[v][i-1],1);
+				}
+				#endif
+				
 				flowCapacityOA[v][i] = IloRangeArray(env,T);
 				#ifndef WaitAfterOperate
 				flowCapacityOB[v][i] = IloRangeArray(env,T);
@@ -623,7 +684,9 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				#ifdef WaitAfterOperate
 				flowCapacityWB[v][i] = IloRangeArray(env,T);
 				#endif
-				
+				#ifndef NBranchingOA
+				IloExpr expr_sumOA(env);
+				#endif
 				for(t=1;t<T;t++){
 					stringstream ss, ss1, ss2, ss3, ss4, ss5, ss6, ss7, ss8, ss9, ss10;
 					ss << "First_level_balance_" << v << "(" << i << "," << t << ")";
@@ -776,9 +839,12 @@ void Model::buildModel(IloEnv& env, Instance inst){
 						model.add(flowCapacityWB[v][i][t]);
 						#endif							
 					}
-				}				
-			
-						
+					#ifndef NBranchingOA
+					if(hasEnteringArc1st[v][i][t]==1)
+						expr_sumOA += oA[v][i][t];
+					#endif
+				}
+				
 				flowCapacityX[v][i] = IloArray<IloRangeArray>(env,N);
 				for(j=1;j<N;j++){ //No arriving arc to source arc j=0
 					if(i != j && i < N-1){ //There is no departing arc from sink node
@@ -791,6 +857,15 @@ void Model::buildModel(IloEnv& env, Instance inst){
 						model.add(flowCapacityX[v][i][j]);
 					}
 				}
+				#ifndef NBranchingOA
+				if(i<J){
+					stringstream sBr;
+					sBr << "branching_OA" << v << "("<<i<<")";
+					branchingOA[v][i-1] = IloRange(env,0, sOA[v][i-1] - expr_sumOA,0,sBr.str().c_str());
+					model.add(branchingOA[v][i-1]);
+					cplex.setPriority(sOA[v][i-1],1);
+				}
+				#endif
 			}
 		}		
 		stringstream ss;
@@ -806,7 +881,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	expr_sinkFlow.end();
 	
 	
-	#ifndef NBranching
+	#ifndef NBranchingX
 		
 	#endif
 	
@@ -953,7 +1028,7 @@ void Model::printSolution(IloEnv env, Instance& inst){
 			for(j=0;j<N;j++){	
 				for(t=0;t<T;t++){
 					if (i==0 && xValue[v][i][j][t]>=0.1) //Starting
-						cout << "Depart at (" << i << "," << t << ") -> (" << j << "," << t+inst.firstTimeAv[v]+1 << ") with load: " << fXValue[v][i][j][t] << endl;
+						cout << "Depart at (" << i << "," << t << ") -> (" << j << "," << t+inst.firstTimeAv[v]+1 << ") with load: " << fXValue[v][i][j][t] << " Cost: " << arcCost[v][i][j][t] << endl;
 					else if(xValue[v][i][j][t] >= 0.1 && j < N-1) //Travelling
 						cout << "Travel from (" << i << "," << t << ") -> (" << j << "," << t+inst.travelTime[v][i-1][j-1] << ") with load: " << fXValue[v][i][j][t] << " Cost: " << arcCost[v][i][j][t] << endl;
 					else if (j == N-1 && xValue[v][i][j][t] >= 0.1) //Sink arcs
@@ -1068,12 +1143,7 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 		cplex.setParam(IloCplex::EpGap, gap/100);
 	//~ cplex.setParam(IloCplex::IntSolLim, 1); //Set number of solutions which must be found before stopping
 	
-	//Define high priority on the branching vairables
-	#ifndef NBranching	
-	for (int j=0;j<y.getSize();j++){
-		cplex.setPriority(y[j],1);
-	}	
-	#endif
+
 }
 void mirp::milp(string file, const double& timeLimit, string optStr){
 	///Time parameters

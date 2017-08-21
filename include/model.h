@@ -50,8 +50,9 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloArray<IloBoolVarArray> > oA;			//Takes value 1 if vessel v starts to operate at port i in time t
 		IloArray<IloArray<IloBoolVarArray> > oB;			//Indicates the succeding operation at port i vessel v starts to operate at port i in time t
 		
-		//Additional variables
-		IloIntVarArray y;						//Number of times a port j is visited during all planing horizon
+		//Branching variables 
+		IloArray<IloIntVarArray> sX;						//Number of times a port i is visited by vessel v during all planing horizon
+		IloArray<IloIntVarArray> sOA;						//Number of times a vessel v starts to operate (or operate) at port i
 		//~ IloArray<IloBoolVarArray> w;			//Used to force a vessel to depart from a region after it is empty(or full)
 	
 		//Information
@@ -121,6 +122,8 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		
 		
 		//Additional constraints;
+		IloArray<IloRangeArray> branchingX;		//Branching rule where sX = sum{j\inJ}{t\inT} x[v][i][j][t]
+		IloArray<IloRangeArray> branchingOA;	//Branching rule where sOA = sum{j\inJ}{t\inT} oA[v][i][t]
 		IloRangeArray y_Sum; 					//For branching (total number visits in port j during all planing horizon)
 		IloArray<IloRangeArray> minVisits;		//Valid inequality - minimum number of operations that must be done in each port from t=0 until time t' 
 		IloArray<IloArray<IloRangeArray> > operateAndGo;	//Ensure that a vessel must exit a region after operate when the vessel capacity is lesser than the maximum operation at port
