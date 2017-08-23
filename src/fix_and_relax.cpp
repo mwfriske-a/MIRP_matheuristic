@@ -15,6 +15,7 @@
 #define NBetas
 #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
 #define NKnapsackInequalities
+//~ #define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 
 ILOSTLBEGIN
 
@@ -314,7 +315,12 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		i = inst.initialPort[v]+1;					//Arcs from initial port i
 		for (t=inst.firstTimeAv[v]+1;t<T;t++){		//and initial time available t
 			for(j=1;j<N-1;j++){						//Not necessary to account sink node
+				#ifdef NSimplifyModel
 				if (i != j){
+				#endif
+				#ifndef NSimplifyModel
+				if (i != j && (inst.typePort[i-1] != inst.typePort[j-1] || inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v]) ){
+				#endif
 					int t2 = t + inst.travelTime[v][i-1][j-1]; 
 					if (t2<T){ 	//If exists time to reach port j 
 						double arc_cost;

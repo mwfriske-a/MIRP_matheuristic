@@ -20,11 +20,13 @@
 //~ #define NTravelAtCapacity
 //~ #define NTravelEmpty
 //~ #define NBerthLimit
+
 //~ #define NBranchingX			//Branching rule on summing variable x
-#define NBranchingOA	//Branching rule on summing variable OA -- Only allowed when WaitAfterOperate is turned of
+#define NBranchingOA		//Branching rule on summing variable OA -- Only allowed when WaitAfterOperate is turned of
 #define NRelaxation
-#define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
+//~ #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
 //~ #define NKnapsackInequalities
+#define NSimplifyModel					//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 
 ILOSTLBEGIN
 
@@ -267,7 +269,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		j = inst.initialPort[v]+1;
 		hasArc[v][0][j][0] = 1;			//Time between source node and initial ports is equal to first time available
 		arcCost[v][0][j][0] = inst.portFee[j-1];
-		expr1 += arcCost[v][0][j][0]*x[v][0][j][0];
+		expr1 += arcCost[v][0][j][0]*x[v][0][j][0] ;		
 		hasEnteringArc1st[v][j][inst.firstTimeAv[v]+1] = 1;
 		x[v][0][j][0].setBounds(1,1); // Fixing initial port position
 				
@@ -275,7 +277,12 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		i = inst.initialPort[v]+1;					//Arcs from initial port i
 		for (t=inst.firstTimeAv[v]+1;t<T;t++){		//and initial time available t			
 			for(j=1;j<N-1;j++){						//Not necessary to account sink node
+				#ifdef NSimplifyModel
 				if (i != j){
+				#endif
+				#ifndef NSimplifyModel
+				if (i != j && (inst.typePort[i-1] != inst.typePort[j-1] || inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v]) ){
+				#endif
 					int t2 = t + inst.travelTime[v][i-1][j-1]; 
 					if (t2<T){ 	//If exists time to reach port j 
 						double arc_cost;
@@ -416,163 +423,214 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	#endif 
 	
 	#ifndef NKnapsackInequalities
-	knapsack_P_1 = IloArray<IloRangeArray> (env, J+1);			//Altough created for all J ports, it is only considered for loading(production) or consumption(discharging) ports
-	knapsack_P_2 = IloArray<IloRangeArray> (env, J+1);	
-	knapsack_D_1 = IloArray<IloRangeArray> (env, J+1);	
+	knapsack_P_1 = IloArray<IloArray<IloRangeArray>> (env, inst.vC); 	//One for each vessel class (capacity)
+	knapsack_P_2 = IloArray<IloRangeArray> (env, J+1);					//Altough created for all J ports, it is only considered for loading(production) or consumption(discharging) ports
+	
+	knapsack_D_1 = IloArray<IloArray<IloRangeArray>> (env, inst.vC);	
+	#ifdef WaitAfterOperate
 	knapsack_D_2 = IloArray<IloRangeArray> (env, J+1);	
-	#ifndef WaitAfterOperate
+	#endif
+	#ifndef WaitAfterOperate							///knapsack_D_2 is only idexed by vesselClass when vessels are not allowed to wait after operated
+	knapsack_D_2 = IloArray<IloArray<IloRangeArray> >(env, inst.vC);	
 	knapsack_D_3 = IloArray<IloRangeArray> (env, J+1);	
 	#endif
 	#endif
-	
-	for(i=1;i<N-1;i++){
-		stringstream ss1;
-		berthLimit[i] = IloRangeArray(env,T);
-		expr_cumSlack.clear();
-		portInventory[i] = IloRangeArray(env,T);				
+	for(int vc=0;vc<inst.vC;vc++){					//For each vessel class
 		#ifndef NKnapsackInequalities
-		if (inst.typePort[i-1] == 0){ 	//Loading port
-			knapsack_P_1[i] = IloRangeArray(env, (T-3)*2);		//(T-2)*2 = Number of combinations 1,...t + t,...,T for all t \in T. Using T-3 because de increment
-			knapsack_P_2[i] = IloRangeArray(env, (T-3)*2);
-		}else{							//Discharging port
-			knapsack_D_1[i] = IloRangeArray(env, (T-3)*2);
-			knapsack_D_2[i] = IloRangeArray(env, (T-3)*2);
-			#ifndef WaitAfterOperate
-			knapsack_D_3[i] = IloRangeArray(env, (T-3)*2);
-			#endif
-		}
-		int it,k,l;
-		IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);
-		for(it=0;it<(T-3)*2;it++){	//For each valid inequality
-			double kP1_RHS=0, kP2_RHS=0, kD1_RHS=0, kD2_RHS=0, sum_alphaMax=0, alphaUB=0;
-			expr_kP1_LHS.clear();
-			expr_kP2_LHS.clear();
-			expr_kD1_LHS.clear();
-			expr_kD2_LHS.clear();
-			//Defining the size of set T =[k,l] - CAUTION: It is inverse of the paper of Agra et al (2013)
-			k=1;
-			l=T-1;
-			if(it<T-3)
-				l = it+2;
-			else
-				k = it+4-l;
-			for(v=0;v<V;v++){
+		knapsack_P_1[vc] = IloArray<IloRangeArray> (env, J+1);	
+		knapsack_D_1[vc] = IloArray<IloRangeArray> (env, J+1);	
+		#ifndef WaitAfterOperate
+		knapsack_D_2[vc] = IloArray<IloRangeArray> (env, J+1);	
+		#endif
+		#endif
+		for(i=1;i<N-1;i++){
+			if(vc==0){		//Only once
+				stringstream ss1;
+				berthLimit[i] = IloRangeArray(env,T);
+				expr_cumSlack.clear();
+				portInventory[i] = IloRangeArray(env,T);
+				#ifndef NKnapsackInequalities
+				if (inst.typePort[i-1] == 0){ 	//Loading port
+					knapsack_P_2[i] = IloRangeArray(env, (T-3)*2);			
+				}
 				#ifdef WaitAfterOperate
-				expr_kP1_LHS += wB[v][i][l];
-				if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
-					expr_kD1_LHS += w[v][i][k-1] + wB[v][i][k-1];
+				else{
+					knapsack_D_2[i] = IloRangeArray(env, (T-3)*2);
+				}				
 				#endif
-				
+				#endif
+			}			
+			#ifndef NKnapsackInequalities
+			if (inst.typePort[i-1] == 0){ 	//Loading port
+				knapsack_P_1[vc][i] = IloRangeArray(env, (T-3)*2);		//(T-2)*2 = Number of combinations 1,...t + t,...,T for all t \in T. Using T-3 because de increment				
+			}else{							//Discharging port
+				knapsack_D_1[vc][i] = IloRangeArray(env, (T-3)*2);
 				#ifndef WaitAfterOperate
-				expr_kP1_LHS += oB[v][i][l];
-				if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
-					expr_kD1_LHS += w[v][i][k-1] + oB[v][i][k-1];
+				knapsack_D_2[vc][i] = IloRangeArray(env, (T-3)*2);				
+				if(vc==0)
+					knapsack_D_3[i] = IloRangeArray(env, (T-3)*2);
 				#endif
-				#ifndef WaitAfterOperate
-				if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
-					expr_kD2_LHS += oB[v][i][k-1];
-				#endif
-				for(t=k;t<=l;t++){
-					expr_kP2_LHS += z[v][i][t];	//It is used for both loading and discharging ports
-					#ifndef WaitAfterOperate
-					expr_kD2_LHS += oA[v][i][t];
-					#endif
+			}
+			int it,k,l;
+			IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);
+			
+			for(it=0;it<(T-3)*2;it++){	//For each valid inequality
+				double kP1_RHS=0, kP2_RHS=0, kD1_RHS=0, kD2_RHS=0,  sum_alphaMax=0, alphaUB=0;
+				expr_kP1_LHS.clear();					
+				expr_kP2_LHS.clear();				
+				expr_kD1_LHS.clear();
+				expr_kD2_LHS.clear();
+				//Defining the size of set T =[k,l] - CAUTION: It is inverse of the paper of Agra et al (2013)
+				k=1;
+				l=T-1;
+				if(it<T-3)
+					l = it+2;
+				else
+					k = it+4-l;
+				for(v=0;v<V;v++){
 					#ifdef WaitAfterOperate
-					expr_kD2_LHS += z[v][i][t];
+					expr_kP1_LHS += ceil(inst.q_v[v]/inst.capacity[vc])*wB[v][i][l];
+					if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
+						expr_kD1_LHS += ceil(inst.q_v[v]/inst.capacity[vc])*w[v][i][k-1] + ceil(inst.q_v[v]/inst.capacity[vc])*wB[v][i][k-1];
 					#endif
-					for(j=0;j<N;j++){						
-						if(j==0 && inst.initialPort[v]+1 == i && t==inst.firstTimeAv[v]+1) 	//Source arc
-							expr_kD1_LHS += x[v][j][i][0];								
-						else if (j == N-1 && hasArc[v][i][j][t] == 1)						//Sink arc
-							expr_kP1_LHS += x[v][i][j][t];
-						else if (j > 0 && j<N-1){											//"Normal" arcs	
-							if(i != j){
-								if(hasArc[v][i][j][t] == 1)
-									expr_kP1_LHS += x[v][i][j][t];
-								if(t - inst.travelTime[v][j-1][i-1] >= 0){					//Only if it is possible an entering arc due the travel time
-									if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1)
-										expr_kD1_LHS += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
+					
+					#ifndef WaitAfterOperate
+					expr_kP1_LHS += ceil(inst.q_v[v]/inst.capacity[vc])*oB[v][i][l];
+					if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
+						expr_kD1_LHS += ceil(inst.q_v[v]/inst.capacity[vc])*w[v][i][k-1] + ceil(inst.q_v[v]/inst.capacity[vc])*oB[v][i][k-1];
+					#endif
+					#ifndef WaitAfterOperate
+					if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
+						expr_kD2_LHS += ceil(inst.q_v[v]/inst.capacity[vc])*oB[v][i][k-1];
+					#endif
+					for(t=k;t<=l;t++){
+						if(vc==0){
+							expr_kP2_LHS += z[v][i][t];	//It is used for both loading and discharging ports (KP2 && KD3)
+							#ifdef WaitAfterOperate
+							expr_kD2_LHS += z[v][i][t];
+							#endif
+						}
+						#ifndef WaitAfterOperate
+						expr_kD2_LHS += ceil(inst.q_v[v]/inst.capacity[vc])*oA[v][i][t];
+						#endif
+						
+						for(j=0;j<N;j++){						
+							if(j==0 && inst.initialPort[v]+1 == i && t==inst.firstTimeAv[v]+1) 	//Source arc
+								expr_kD1_LHS += ceil(inst.q_v[v]/inst.capacity[vc])*x[v][j][i][0];								
+							else if (j == N-1 && hasArc[v][i][j][t] == 1)						//Sink arc
+								expr_kP1_LHS += ceil(inst.q_v[v]/inst.capacity[vc])*x[v][i][j][t];
+							else if (j > 0 && j<N-1){											//"Normal" arcs	
+								if(i != j){
+									if(hasArc[v][i][j][t] == 1)
+										expr_kP1_LHS += ceil(inst.q_v[v]/inst.capacity[vc])*x[v][i][j][t];
+									if(t - inst.travelTime[v][j-1][i-1] >= 0){					//Only if it is possible an entering arc due the travel time
+										if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1)
+											expr_kD1_LHS += ceil(inst.q_v[v]/inst.capacity[vc])*x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
+									}
 								}
 							}
 						}
 					}
 				}
-			}
-			for(t=k;t<=l;t++){
-				//~ sum_alphaMax += inst.alp_max_jt[i-1][t-1];
-				kP1_RHS += inst.d_jt[i-1][t-1];	
-				kD1_RHS += inst.d_jt[i-1][t-1];
-			}
-			//~ alphaUB = min(sum_alphaMax, inst.alp_max_j[i-1]);
-			kP1_RHS += -inst.sMax_jt[i-1][0] - alphaUB;
-			kP2_RHS = ceil(kP1_RHS/inst.f_max_jt[i-1][0]);
-			kP1_RHS = ceil(kP1_RHS/inst.maxCapacity);
-			
-			if(k==1)
-				kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0] - alphaUB;
-			else
-				kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0] - alphaUB;
-			kD2_RHS = ceil(kD1_RHS/inst.f_max_jt[i-1][0]);
-			kD1_RHS = ceil(kD1_RHS/inst.maxCapacity);
-			
-			stringstream ss, ss1, ss2;
-			if(inst.typePort[i-1] == 0){
-				ss << "knpasackP1_" << i << "," << it;
-				knapsack_P_1[i][it] = IloRange(env, kP1_RHS, expr_kP1_LHS, IloInfinity, ss.str().c_str());
-				ss1 << "knapsackP2_" << i << "," << it;
-				knapsack_P_2[i][it] = IloRange(env, kP2_RHS, expr_kP2_LHS, IloInfinity, ss1.str().c_str());
-			}else{
-				ss << "knpasackD1_" << i << "," << it;
-				knapsack_D_1[i][it] = IloRange(env, kD1_RHS, expr_kD1_LHS, IloInfinity, ss.str().c_str());
-				ss1 << "knpasackD2_" << i << "," << it;
-				knapsack_D_2[i][it] = IloRange(env, kD1_RHS, expr_kD2_LHS, IloInfinity, ss1.str().c_str());
-				#ifndef WaitAfterOperate
-				ss2 << "knpasackD3_" << i << "," << it;
-				knapsack_D_3[i][it] = IloRange(env, kD2_RHS, expr_kP2_LHS, IloInfinity, ss2.str().c_str());
-				#endif
-			}
-		}
-		if(inst.typePort[i-1] == 0){
-			model.add(knapsack_P_1[i]);
-			model.add(knapsack_P_2[i]);
-		}else{
-			model.add(knapsack_D_1[i]);
-			model.add(knapsack_D_2[i]);
-			#ifndef WaitAfterOperate
-			model.add(knapsack_D_3[i]);
-			#endif
-		}		
-		#endif
-		
-		for(t=1;t<T;t++){
-			expr_berth.clear();
-			expr_invBalancePort.clear();
-			stringstream ss, ss2;
-			ss << "berthLimit_(" << i << "," << t << ")";
-			bool emptyExpr = true;			
-			for(v=0;v<V;v++){				
-				if (hasEnteringArc1st[v][i][t]==1){ //Only if exists an entering arc in the node				
-					expr_berth += z[v][i][t];
-					emptyExpr = false;
+				for(t=k;t<=l;t++){					
+					kP1_RHS += inst.d_jt[i-1][t-1];	
+					kD1_RHS += inst.d_jt[i-1][t-1];
+				}				
+				kP1_RHS += -inst.sMax_jt[i-1][0];
+				
+				if(vc==0)
+					kP2_RHS = ceil(kP1_RHS/inst.f_max_jt[i-1][0]);
+					
+				//~ kP1_RHS = ceil(kP1_RHS/inst.maxCapacity);
+				kP1_RHS = ceil(kP1_RHS/inst.capacity[vc]);
+				
+				if(k==1)
+					kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0];
+				else
+					kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0];
+				
+				kD2_RHS = ceil(kD1_RHS/inst.f_max_jt[i-1][0]);
+				//~ kD1_RHS = ceil(kD1_RHS/inst.maxCapacity);
+				kD1_RHS = ceil(kD1_RHS/inst.capacity[vc]);
+				
+				stringstream ss, ss1, ss2;
+				if(inst.typePort[i-1] == 0){
+					ss << "knpasackP1_" << i << "," << it << "(" << vc << ")";
+					knapsack_P_1[vc][i][it] = IloRange(env, kP1_RHS, expr_kP1_LHS, IloInfinity, ss.str().c_str());
+					if(vc==0){
+						ss1 << "knapsackP2_" << i << "," << it;
+						knapsack_P_2[i][it] = IloRange(env, kP2_RHS, expr_kP2_LHS, IloInfinity, ss1.str().c_str());
+					}
+				}else{
+					ss << "knpasackD1_" << i << "," << it << "(" << vc << ")";
+					knapsack_D_1[vc][i][it] = IloRange(env, kD1_RHS, expr_kD1_LHS, IloInfinity, ss.str().c_str());
+					#ifdef WaitAfterOperate
+					if(vc==0){
+						ss1 << "knpasackD2_" << i << "," << it;
+						knapsack_D_2[i][it] = IloRange(env, kD2_RHS, expr_kD2_LHS, IloInfinity, ss1.str().c_str());
+					}
+					#endif
+					#ifndef WaitAfterOperate
+					ss1 << "knpasackD2_" << i << "," << it << "(" << vc << ")";
+					knapsack_D_2[vc][i][it] = IloRange(env, kD1_RHS, expr_kD2_LHS, IloInfinity, ss1.str().c_str());
+					if(vc==0){
+						ss2 << "knpasackD3_" << i << "," << it;
+						knapsack_D_3[i][it] = IloRange(env, kD2_RHS, expr_kP2_LHS, IloInfinity, ss2.str().c_str());
+					}
+					#endif
 				}
-				expr_invBalancePort += -f[v][i][t];
 			}
-			if(!emptyExpr){ //Only if there are some Z variable in the expr
-				berthLimit[i][t] = IloRange(env,-IloInfinity, expr_berth, inst.b_j[i-1], ss.str().c_str());									
-				model.add(berthLimit[i][t]);
-			}
+			if(inst.typePort[i-1] == 0){
+				model.add(knapsack_P_1[vc][i]);
+				if(vc==0)
+					model.add(knapsack_P_2[i]);
+			}else{
+				model.add(knapsack_D_1[vc][i]);
+				#ifdef WaitAfterOperate
+				if(vc==0)
+					model.add(knapsack_D_2[i]);
+				#endif
+				#ifndef WaitAfterOperate
+				model.add(knapsack_D_2[vc][i]);
+				if(vc==0)
+					model.add(knapsack_D_3[i]);
+				#endif
+			}		
+			#endif
 			
-			expr_cumSlack += alpha[i][t];
-			expr_invBalancePort += -alpha[i][t];
-			ss2 << "invBalancePort_(" << i << "," << t << ")";
-			portInventory[i][t] = IloRange(env, inst.delta[i-1]*inst.d_jt[i-1][t-1],
-				sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
-				inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
-			model.add(portInventory[i][t]);
+			if(vc==0){		//Only once
+				for(t=1;t<T;t++){
+					expr_berth.clear();
+					expr_invBalancePort.clear();
+					stringstream ss, ss2;
+					ss << "berthLimit_(" << i << "," << t << ")";
+					bool emptyExpr = true;			
+					for(v=0;v<V;v++){				
+						if (hasEnteringArc1st[v][i][t]==1){ //Only if exists an entering arc in the node				
+							expr_berth += z[v][i][t];
+							emptyExpr = false;
+						}
+						expr_invBalancePort += -f[v][i][t];
+					}
+					if(!emptyExpr){ //Only if there are some Z variable in the expr
+						berthLimit[i][t] = IloRange(env,-IloInfinity, expr_berth, inst.b_j[i-1], ss.str().c_str());									
+						model.add(berthLimit[i][t]);
+					}
+					
+					expr_cumSlack += alpha[i][t];
+					expr_invBalancePort += -alpha[i][t];
+					ss2 << "invBalancePort_(" << i << "," << t << ")";
+					portInventory[i][t] = IloRange(env, inst.delta[i-1]*inst.d_jt[i-1][t-1],
+						sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
+						inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
+					model.add(portInventory[i][t]);
+				}
+				stringstream ss1;
+				ss1 << "cum_slack("<<i<<")";
+				cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
+				model.add(cumSlack[i]);
+			}
 		}
-		ss1 << "cum_slack("<<i<<")";
-		cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
-		model.add(cumSlack[i]);
 	}
 	expr_cumSlack.end();
 	expr_berth.end();

@@ -62,6 +62,8 @@ IloNum constantForSinglePeriodAlphaSlack;
 IloNum constantForCumulativeAlphaSlack;     
 int numTotalPorts;
 
+IloNumArray capacity;
+
 //Ports (loading and discharging and regions merged)
 IloNumArray alp_max_j; 		//upper bound on the cummulative amount of product that can be sold to/bought from the spot market at port j
 IloNumArray b_j;			//# of berths

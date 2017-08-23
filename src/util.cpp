@@ -463,7 +463,7 @@ void Instance::readInstance(IloEnv& env, const string& name){
       exit(1);
 	}
 	//Auxiliar data for using after on the vessel data
-	IloNumArray capacity(env,vC);   
+	capacity = IloNumArray(env,vC);   
 	IloNumArray avgSpeedInKnots(env,vC);   
 	IloNumArray travelCostAsTermPerKm(env,vC);   
 	IloNumArray discountTravelingEmpty(env,vC);   
