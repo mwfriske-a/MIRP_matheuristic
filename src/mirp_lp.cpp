@@ -21,12 +21,12 @@
 //~ #define NTravelEmpty
 //~ #define NBerthLimit
 
-//~ #define NBranchingX			//Branching rule on summing variable x
+#define NBranchingX			//Branching rule on summing variable x
 #define NBranchingOA		//Branching rule on summing variable OA -- Only allowed when WaitAfterOperate is turned of
 #define NRelaxation
-//~ #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
+#define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
 //~ #define NKnapsackInequalities
-#define NSimplifyModel					//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
+//~ #define NSimplifyModel					//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 
 ILOSTLBEGIN
 
@@ -293,11 +293,11 @@ void Model::buildModel(IloEnv& env, Instance inst){
 						}
 						hasArc[v][i][j][t] = 1;	
 						arcCost[v][i][j][t] = arc_cost;
-						hasEnteringArc1st[v][j][t2] = 1;
-						if (t2+1<T-1) 			//Waiting arc 
-							hasEnteringArc1st[v][j][t2+1] = 1;
 						expr1 += arc_cost*x[v][i][j][t];
-
+						hasEnteringArc1st[v][j][t2] = 1;
+						//Waiting arc for j
+						if (t2+1<T-1) 			
+							hasEnteringArc1st[v][j][t2+1] = 1;						
 						//Sink arc from port j 
 						hasArc[v][j][N-1][t2] = 1;
 						arcCost[v][j][N-1][t2] = -(T-t2-1)*inst.perPeriodRewardForFinishingEarly;
@@ -309,12 +309,12 @@ void Model::buildModel(IloEnv& env, Instance inst){
 							}else{
 								arc_cost = inst.costKm[v]*inst.distanceMatrix[j-1][i-1] + inst.portFee[i-1];
 							}
+							expr1 += arc_cost*x[v][j][i][t];
 							hasArc[v][j][i][t] = 1;
 							arcCost[v][j][i][t] = arc_cost;
 							hasEnteringArc1st[v][i][t2] = 1;
-							expr1 += arc_cost*x[v][j][i][t];							
 						}
-						//~ //Create arc from j,t2 to others ports (j2) in time t3
+						//Create arc from j,t2 to others ports (j2) in time t3
 						for(int j2=1;j2<=J;j2++){
 							if(j2 != i && j2 != j){
 								int t3 = t2+inst.travelTime[v][j-1][j2-1];  
@@ -328,13 +328,43 @@ void Model::buildModel(IloEnv& env, Instance inst){
 									arcCost[v][j][j2][t2] = arc_cost;
 									expr1 += arc_cost*x[v][j][j2][t2];
 									hasEnteringArc1st[v][j2][t3] = 1;
+									
+									#ifndef NSimplifyModel
+									//Arcs from (j2,t3)
+									if(hasEnteringArc1st[v][j2][t3] == 0){	//Only if this node has not 'explored' yet
+										//Waiting
+										if (t3+1<T-1) 			
+											hasEnteringArc1st[v][j2][t3+1] = 1;
+										//Sink
+										hasArc[v][j2][N-1][t3] = 1;
+										arcCost[v][j2][N-1][t3] = -(T-t3-1)*inst.perPeriodRewardForFinishingEarly;
+										expr1 += arcCost[v][j2][N-1][t3]*x[v][j2][N-1][t3];
+										//Travelling
+										for(int j3=1;j3<=J;j3++){
+											if(j3 != j2){
+												int t4 = t3+inst.travelTime[v][j2-1][j3-1];  
+												if(t3<T){
+												if (inst.typePort[j2-1]==1 && inst.typePort[j3-1]==0){
+													arc_cost = inst.costKm[v]*inst.distanceMatrix[j2-1][j3-1]*(1-inst.trav_empt[v]) + inst.portFee[j3-1];		
+												}else{
+													arc_cost = inst.costKm[v]*inst.distanceMatrix[j2-1][j3-1] + inst.portFee[j3-1];
+												}
+												hasArc[v][j2][j3][t3] = 1;
+												arcCost[v][j2][j3][t3] = arc_cost;
+												expr1 += arc_cost*x[v][j2][j3][t3];
+												hasEnteringArc1st[v][j3][t4] = 1;
+												} 
+											}
+										}
+									}								
+									#endif
 								}
 							}
 						}
 					}
 				}
 			}
-			if(t+1<T)
+			if(t+1<T) //Waiting arc from i
 				hasEnteringArc1st[v][i][t+1] = 1;
 			//Sink arc from port i
 			hasArc[v][i][N-1][t] = 1;

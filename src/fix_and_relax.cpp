@@ -13,7 +13,7 @@
 //~ #define NBerthLimit
 #define NBranching
 #define NBetas
-#define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
+//~ #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
 #define NKnapsackInequalities
 //~ #define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 

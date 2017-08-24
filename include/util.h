@@ -44,7 +44,6 @@ namespace mirp{
 	
 struct Instance{
 ///Parameters
-
 //Metadata
 IloInt t; 					//# Time periods
 IloInt hoursPerPeriod;		//# hors per period
@@ -83,12 +82,17 @@ NumNumMatrix distanceMatrix;		//Distance between port i and j;
 //Regular nodes - port time pairs (j,t) 
 NumNumMatrix alp_max_jt; 	//upper bound on the amount of product that can be sold to/bought fromthe spot market at port j in time period t
 NumNumMatrix d_jt;			//# units produced/consumed at port j in time t
+NumNumMatrix dM_jt;			//# units consumed at port j in time t (depends of sMinM_jt)
 NumNumMatrix f_min_jt;		// minimum amount of product that can be loaded/discharged at port j in time period t;
 NumNumMatrix f_max_jt;		// max amount of product that can be loaded/discharged at port j in timeperiod t;
 NumNumMatrix p_jt; 			// penality parameter associated  with one unit of lost production or stockout at port j in time period t;
 NumNumMatrix r_jt;			// the unit sales revenue for product discharged at por j in time period t (equals 0 in the loading ports)
 NumNumMatrix sMin_jt;		// lower bound of port j in time period t
+NumNumMatrix sMinM_jt;		// modified lower bound of port j in time period t - Only for discharging ports
 NumNumMatrix sMax_jt;		// capacity of port j in time period t
+NumNumMatrix lb_oper_jt;		// Lower bound on the number of operating periods needed during the first t periods (depends of dM_jt)
+
+
 
 //Additional information
 IloNumArray f_min_r; //Min f_min_jt per region R (assuming that f_min_r is fixed for all t \in T)
