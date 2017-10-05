@@ -13,9 +13,9 @@
 //~ #define NBerthLimit
 #define NBranching
 #define NBetas
-//~ #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
+#define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
 #define NKnapsackInequalities
-//~ #define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
+#define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 
 ILOSTLBEGIN
 
@@ -293,7 +293,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                 #ifndef NBetas
                 ss.str(string());
 				ss << "beta_(" << i << "," << t << ")";
-				beta[i][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
+				beta[i][t] = IloNumVar(env, 0, inst.d_jt[i-1][t-1], ss.str().c_str());
                 #endif
 			}
 		}
@@ -330,9 +330,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 							arc_cost = inst.costKm[v]*inst.distanceMatrix[i-1][j-1] + inst.portFee[j-1];
 						}
 						hasArc[v][i][j][t] = 1;	
-						arcCost[v][i][j][t] = arc_cost;
-						if(t2 <= tOEB)      //If arriving node is in the model
-                            expr1 += arc_cost*x[v][i][j][t];
+						arcCost[v][i][j][t] = arc_cost;                        
+						if(t2 <= tOEB)      //If arriving node is in the model                            
+                            expr1 += arcCost[v][i][j][t]*x[v][i][j][t];
                         hasEnteringArc1st[v][j][t2] = 1;
 						if (t2+1<T-1) 			//Waiting arc 
 							hasEnteringArc1st[v][j][t2+1] = 1;
@@ -353,7 +353,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 							arcCost[v][j][i][t] = arc_cost;
 							hasEnteringArc1st[v][i][t2] = 1;
 							if(t2 <= tOEB)      //If arriving node is in the model
-                                expr1 += arc_cost*x[v][j][i][t];
+                                expr1 += arcCost[v][j][i][t]*x[v][j][i][t];
 						}
 						//Create arc from j,t2 to others ports (j2) in time t3
 						for(int j2=1;j2<=J;j2++){
@@ -368,7 +368,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 									hasArc[v][j][j2][t2] = 1;
 									arcCost[v][j][j2][t2] = arc_cost;
 									if(t3 <= tOEB)      //Ir arriving node is in the model
-                                        expr1 += arc_cost*x[v][j][j2][t2];
+                                        expr1 += arcCost[v][j][j2][t2]*x[v][j][j2][t2];
 									hasEnteringArc1st[v][j2][t3] = 1;
 								}
 							}
@@ -387,7 +387,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 
 		for(i=1;i<N-1;i++){		//Only considering ports
 			for(t=1;t<=tOEB;t++){
-				if(hasEnteringArc1st[v][i][t]){
+				if(hasEnteringArc1st[v][i][t]==1){
 					expr += inst.r_jt[i-1][t-1]*f[v][i][t];									//1st term
 					expr1 += (t-1)*inst.attemptCost*z[v][i][t];								//3rd term
 				}
@@ -764,8 +764,8 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					if (t==1 || (t < tOEB && hasEnteringArc1st[v][i][t-1]==0)){ //First time period or not last time period nor entering arc in the previous time period
 						expr_1stLevel += - w[v][i][t] - oA[v][i][t];
                         expr_2ndLevel += -oA[v][i][t] + oB[v][i][t];
-                        expr_link = oA[v][i][t] - z[v][i][t];						
-                        expr_1stFlow+= -fW[v][i][t] - fOA[v][i][t];						
+                        expr_link = oA[v][i][t] - z[v][i][t];
+                        expr_1stFlow+= -fW[v][i][t] - fOA[v][i][t];
 						expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t];
 					}else if (t==tOEB){ //Last time period
                         if (hasEnteringArc1st[v][i][t-1]==1){
@@ -909,10 +909,6 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		
 	#endif
 	
-	#ifndef NValidInequalities
-	
-	#endif	
-	
 	#ifndef NOperateAndGo
 	
 	#endif	
@@ -990,8 +986,8 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 	IloExpr expr_obj_revenue(env);
 	for(v=0;v<V;v++){
 		for(i=1;i<=J;i++){
-			for(t=0;t<=tF;t++){
-				for(j=i+1;j<N;j++){
+			for(t=1;t<=tF;t++){
+				for(j=1;j<N;j++){
 					if(hasArc[v][i][j][t]==1){
 						if(j<=J){ 								//If j is a port
 							int t2 = t + inst.travelTime[v][i-1][j-1]; 
@@ -1003,7 +999,7 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 						}
 					}
 				}
-				if(t>=tS && hasEnteringArc1st[v][i][t]){
+				if(t>=tS && hasEnteringArc1st[v][i][t]==1){
 					expr_obj_revenue += inst.r_jt[i-1][t-1]*f[v][i][t];						//1st term
 					expr_obj_cost += (t-1)*inst.attemptCost*z[v][i][t];						//3rd term				
 				}
@@ -1195,8 +1191,9 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
     
 	//New objective
 	obj.setExpr(expr_obj_current + expr_obj_cost - expr_obj_revenue);
+    
     IloExpr expr_cumSlack(env), expr_berth(env), expr_invBalancePort(env);
-	for(i=1;i<N-1;i++){        
+	for(i=1;i<=J;i++){        
 		expr_cumSlack.clear();
         expr_cumSlack = cumSlack[i].getExpr();
 		for(t=tS;t<=tF;t++){
@@ -1246,7 +1243,7 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
                 expr_1stFlow.clear();
                 expr_2ndFlow.clear();
                 
-                if(hasEnteringArc1st[v][i][tS-1]){ //Only necessary if there is entering arc in the node					
+                if(hasEnteringArc1st[v][i][tS-1]==1){ //Only necessary if there is entering arc in the node
 					expr_1stLevel = firstLevelBalance[v][i][tS-1].getExpr();
 					expr_2ndLevel = secondLevelBalance[v][i][tS-1].getExpr();
 					expr_1stFlow = firstLevelFlow[v][i][tS-1].getExpr();
@@ -1534,6 +1531,7 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 
 	#endif
 }
+
 void Model::reIntegralize(IloEnv& env, Instance inst, const int& tS, const int& tF){
 	int i,j,t,v;
 	int J = inst.numTotalPorts;	

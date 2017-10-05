@@ -113,19 +113,32 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloArray<IloRangeArray> >   flowCapacityWB;
 		
 		///Valid inequalities
+		//For multiples denominators
 		//Loading ports
-		IloArray<IloArray<IloRangeArray> >knapsack_P_1; //Inequalities for the case where T_v = T (for each Q_v, j and it)
+		//~ IloArray<IloArray<IloRangeArray> >knapsack_P_1; //Inequalities for the case where T_v = T (for each Q_v, j and it)
+		//~ IloArray<IloRangeArray> knapsack_P_2; //Inequalities for the case where T_v = \emptyset
+		//~ //Dischargin ports
+		//~ IloArray<IloArray<IloRangeArray> > knapsack_D_1; //Case R²_v = T 
+		//~ #ifndef WaitAfterOperate
+		//~ IloArray<IloArray<IloRangeArray> > knapsack_D_2; //Case R¹_v = T
+		//~ IloArray<IloRangeArray> knapsack_D_3; //Case R⁰_v = T
+		//~ #endif
+		//~ #ifdef WaitAfterOperate
+		//~ IloArray<IloRangeArray>  knapsack_D_2; //Case R¹_v = T
+		//~ #endif
+		//For one denominator
+		//Loading ports
+		IloArray<IloRangeArray> knapsack_P_1; //Inequalities for the case where T_v = T (for each Q_v, j and it)
 		IloArray<IloRangeArray> knapsack_P_2; //Inequalities for the case where T_v = \emptyset
 		//Dischargin ports
-		IloArray<IloArray<IloRangeArray> > knapsack_D_1; //Case R²_v = T 
+		IloArray<IloRangeArray> knapsack_D_1; //Case R²_v = T 
 		#ifndef WaitAfterOperate
-		IloArray<IloArray<IloRangeArray> > knapsack_D_2; //Case R¹_v = T
+		IloArray<IloRangeArray> knapsack_D_2; //Case R¹_v = T
 		IloArray<IloRangeArray> knapsack_D_3; //Case R⁰_v = T
 		#endif
 		#ifdef WaitAfterOperate
 		IloArray<IloRangeArray>  knapsack_D_2; //Case R¹_v = T
 		#endif
-		
 		//Additional constraints;
 		IloArray<IloRangeArray> branchingX;		//Branching rule where sX = sum{j\inJ}{t\inT} x[v][i][j][t]
 		IloArray<IloRangeArray> branchingOA;	//Branching rule where sOA = sum{j\inJ}{t\inT} oA[v][i][t]

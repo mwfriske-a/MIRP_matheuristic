@@ -82,7 +82,7 @@ NumNumMatrix distanceMatrix;		//Distance between port i and j;
 //Regular nodes - port time pairs (j,t) 
 NumNumMatrix alp_max_jt; 	//upper bound on the amount of product that can be sold to/bought fromthe spot market at port j in time period t
 NumNumMatrix d_jt;			//# units produced/consumed at port j in time t
-NumNumMatrix dM_jt;			//# units consumed at port j in time t (depends of sMinM_jt)
+NumNumMatrix dM_jt;			//# units produced/consumed at port j in time t (depends of sMinM_jt and sMaxM_jt)
 NumNumMatrix f_min_jt;		// minimum amount of product that can be loaded/discharged at port j in time period t;
 NumNumMatrix f_max_jt;		// max amount of product that can be loaded/discharged at port j in timeperiod t;
 NumNumMatrix p_jt; 			// penality parameter associated  with one unit of lost production or stockout at port j in time period t;
@@ -90,7 +90,10 @@ NumNumMatrix r_jt;			// the unit sales revenue for product discharged at por j i
 NumNumMatrix sMin_jt;		// lower bound of port j in time period t
 NumNumMatrix sMinM_jt;		// modified lower bound of port j in time period t - Only for discharging ports
 NumNumMatrix sMax_jt;		// capacity of port j in time period t
-NumNumMatrix lb_oper_jt;		// Lower bound on the number of operating periods needed during the first t periods (depends of dM_jt)
+NumNumMatrix sMaxM_jt;		// modified upper bound of port j in time period t - Only for loading ports 
+NumNumMatrix lb_oper_jt;	// Lower bound on the number of operating periods needed during the first t periods (depends of dM_jt) - = \tilde{O}_{it} defined in Agra et al 2013
+NumNumMatrix delta_it;		// Vector of diference of lb_oper_jt and lb_oper_j,t-1
+IloIntArray p_delta_j;		//Storage for each i \in J the index of delta_it in which delta_it = 1 (we will use the size of p_delta_j)
 
 
 

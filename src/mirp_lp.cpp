@@ -25,8 +25,8 @@
 #define NBranchingOA		//Branching rule on summing variable OA -- Only allowed when WaitAfterOperate is turned of
 #define NRelaxation
 #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
-//~ #define NKnapsackInequalities
-//~ #define NSimplifyModel					//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
+#define NKnapsackInequalities
+#define NSimplifyModel					//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 
 ILOSTLBEGIN
 
