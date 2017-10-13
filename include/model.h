@@ -169,6 +169,7 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		void buildFixAndRelaxHVModel(IloEnv& env,Instance inst, const double& nIntervals, const int& endBlock, const int& outVessels);
 		void setParameters(IloEnv& env, const double& timeLimit, const double& gap);
 		void fixSolution(IloEnv& env, Instance inst, const int& t3S, const int& t3F, const int& p);
+		void modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const int& tS_fix, const int& tF_fix, const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int);
 		void fixAllSolution(IloEnv& env, const Instance& inst);
 		void decreaseEndBlock (IloEnv& env, Instance inst, const double& nIntervals, const int& t2S, const int& t2F); //Add to the model FO and constranints the variables between t2S and t2F
 		void reIntegralize(IloEnv& env, Instance inst, const int& t1S, const int& t1F);
@@ -189,8 +190,7 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		void integralizeVesselInterval(Instance inst, const int& vInt, const int& tS, const int& tF);
 		void resetObjFunction(IloEnv& env, Instance inst);
 		void fixVesselLessInterval(IloEnv env, Instance inst, const int& v, const int& tS, const int& tF);
-		void fixAndOptTW(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);
-		
-		void regionLocalSearch(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<std::chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);
+		void fixAndOptTW(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);		
+		void typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<std::chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);
 	};
 }
