@@ -15,7 +15,7 @@
 #define NBetas
 #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
 #define NKnapsackInequalities
-#define NSimplifyModel						//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
+#define NSimplifyModel					//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 #define NFixSinkArc
 
 ILOSTLBEGIN
@@ -922,7 +922,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	#ifndef N2PortNorevisit
 
 	#endif
-}
+}	
 
 /* Param p = 0 If algorithm can extract var solution values; 1 otherwise*/
 void Model::fixSolution(IloEnv& env, Instance inst, const int& tS, const int& tF,const int& p){
@@ -995,230 +995,13 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 	int T = inst.t+1;
 	double intPart;	
 	int V = inst.speed.getSize(); //# of vessels
-    int N = J + 2;
+    int N = J + 1;
 	
     ///Objective function
 	IloExpr expr_obj_current = cplex.getObjective().getExpr(); //Gets the current objective function
 	IloExpr expr_obj_cost(env);
 	IloExpr expr_obj_revenue(env);
-	for(v=0;v<V;v++){
-		for(i=1;i<=J;i++){
-			for(j=1;j<N;j++){
-				if(j<=J)
-					t0 = max(1,tS-(int)inst.travelTime[v][i-1][j-1]);
-				else //when J corresponds to the sink node
-					t0 = tS; 
-				for(t=t0;t<=tF;t++){
-					if(hasArc[v][i][j][t]==1){
-						if(j<=J){ 								//If j is a port
-							int t2 = t + inst.travelTime[v][i-1][j-1]; 
-							if(t2>=tS && t2<=tF)     			//If was not present in the model
-								expr_obj_cost += arcCost[v][i][j][t]*x[v][i][j][t];
-						}else{									//If j is sink node
-							if(t>=tS)
-								expr_obj_cost += arcCost[v][i][j][t]*x[v][i][j][t];
-						}
-					}
-					//Only for the current block - (v,i,t)
-					if(j==1 && t>=tS){
-						if(hasEnteringArc1st[v][i][t]==1){
-							expr_obj_revenue += inst.r_jt[i-1][t-1]*f[v][i][t];						//1st term
-							expr_obj_cost += (t-1)*inst.attemptCost*z[v][i][t];						//3rd term				
-						}
-					}
-					//Port-time iterator (i,t)
-					if(v==0 && j==1 && t>= tS){
-						expr_obj_cost += inst.p_jt[i-1][t-1]*alpha[i][t];								//4rd term
-						#ifndef NBetas
-						expr_obj_cost += 1000*beta[i][t];										//Auxiliary variables
-						#endif
-					}
-				}				
-			}
-		}
-	}
-	//New objective
-	obj.setExpr(expr_obj_current + expr_obj_cost - expr_obj_revenue);
-	expr_obj_current.end();
-    expr_obj_cost.end();
-    expr_obj_revenue.end();
-    
-	#ifndef NKnapsackInequalities // TODO fix it!
-	for(i=1;i<=J;i++){		
-		int it,it2=0,k,l;
-		IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);
-		for(it=0;it <((T-3)*2 - (T-1-tF));it++){	//'Revise' existing inequalities (x variables) and add the new until [tF-1, tF]
-			double kP1_RHS=0, kP2_RHS=0, kD1_RHS=0, kD2_RHS=0, sum_alphaMax=0, alphaUB=0;
-			expr_kP1_LHS.clear();
-			expr_kP2_LHS.clear();
-			expr_kD1_LHS.clear();
-			expr_kD2_LHS.clear();
-			//Definining the size of set T =[k,l] - CAUTION: It is inverse of the paper of Agra et al (2013)
-			k=1;
-			l=tF;
-			if(it<tF-2){
-				l = it+2;
-				it2++;
-			}else if(it==tF-2){
-				it = T-3;
-				k = it2+4-l;
-				it2++;
-			}else{
-				k = it2+4-l;
-				it2++;
-			}            
-			if( (it >= tS-2 && it < tF-2) || (it > T-3 + tS-2) ){ //valid inequality is created from scratch - If it is in interval [1...[tS-2..tF-1]], or If it is in interval [[2..tS-1]...tF]
-				for(v=0;v<V;v++){
-					#ifdef WaitAfterOperate
-						expr_kP1_LHS += wB[v][i][k];
-					if(k>1 || hasEnteringArc1st[v][i][k-1]==1)      //TODO verificar se não deve ser &&
-						expr_kD1_LHS += w[v][i][k-1] + wB[v][i][k-1];
-					#endif
-					#ifndef WaitAfterOperate
-						expr_kP1_LHS += oB[v][i][k];
-
-					if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
-						expr_kD1_LHS += w[v][i][k-1] + oB[v][i][k-1];
-					#endif
-					#ifndef WaitAfterOperate
-					if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
-						expr_kD2_LHS += oB[v][i][k-1];
-					#endif
-					for(t=k;t<=l;t++){                       
-						expr_kP2_LHS += z[v][i][t];	//It is used for both loading and discharging ports
-						#ifndef WaitAfterOperate
-						expr_kD2_LHS += oA[v][i][t];
-						#endif
-						#ifdef WaitAfterOperate
-						expr_kD2_LHS += z[v][i][t];
-						#endif
-						for(j=0;j<N;j++){						
-							if(j==0 && inst.initialPort[v]+1 == i && t==inst.firstTimeAv[v]+1) 	//Source arc
-								expr_kD1_LHS += x[v][j][i][0];								
-							else if (j == N-1 && hasArc[v][i][j][t] == 1)						//Sink arc
-								expr_kP1_LHS += x[v][i][j][t];
-							else if (j > 0 && j < N-1){											//"Normal" arcs
-								if(i != j){
-									if(hasArc[v][i][j][t] == 1 && t+inst.travelTime[v][i-1][j-1] <= tF)  //If arc exists and arrives at port j in the integer or relaxed block
-										expr_kP1_LHS += x[v][i][j][t];
-									if(t - inst.travelTime[v][j-1][i-1] >= 0){					//Only if it is possible an entering arc due the travel time
-										if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1)
-											expr_kD1_LHS += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
-									}
-								}
-							}
-						}
-					}
-				}
-			
-				for(t=k;t<=l;t++){
-					kP1_RHS += inst.d_jt[i-1][t-1];
-					kD1_RHS += inst.d_jt[i-1][t-1];
-				}
-				kP1_RHS += -inst.sMax_jt[i-1][0];
-				kP2_RHS = ceil(kP1_RHS/inst.f_max_jt[i-1][0]);
-				kP1_RHS = ceil(kP1_RHS/inst.maxCapacity);
-				
-				if(k==1)
-					kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0];
-				else
-					kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0];
-				kD2_RHS = ceil(kD1_RHS/inst.f_max_jt[i-1][0]);
-				kD1_RHS = ceil(kD1_RHS/inst.maxCapacity);
-				
-				stringstream ss, ss1, ss2;
-				if(inst.typePort[i-1] == 0){
-					ss << "knpasackP1_" << i << "," << it;
-					knapsack_P_1[i][it] = IloRange(env, kP1_RHS, expr_kP1_LHS, IloInfinity, ss.str().c_str());
-					ss1 << "knapsackP2_" << i << "," << it;
-					knapsack_P_2[i][it] = IloRange(env, kP2_RHS, expr_kP2_LHS, IloInfinity, ss1.str().c_str());
-					model.add(knapsack_P_1[i][it]);
-					model.add(knapsack_P_2[i][it]);
-				}else{
-					ss << "knpasackD1_" << i << "," << it;
-					knapsack_D_1[i][it] = IloRange(env, kD1_RHS, expr_kD1_LHS, IloInfinity, ss.str().c_str());
-					ss1 << "knpasackD2_" << i << "," << it;
-					knapsack_D_2[i][it] = IloRange(env, kD1_RHS, expr_kD2_LHS, IloInfinity, ss1.str().c_str());
-					model.add(knapsack_D_1[i][it]);
-					model.add(knapsack_D_2[i][it]);
-					#ifndef WaitAfterOperate
-					ss2 << "knpasackD3_" << i << "," << it;
-					knapsack_D_3[i][it] = IloRange(env, kD2_RHS, expr_kP2_LHS, IloInfinity, ss2.str().c_str());
-					model.add(knapsack_D_3[i]);
-					#endif
-				}
-			}else if (it >= 0 && it < tS-2 ){		//Only modify the previously added valid inequalities of type [1..j] (only needed add x variables in the case of loading ports)
-				//Get the current expr values                 
-				if (inst.typePort[i-1] == 0){
-                    expr_kP1_LHS = knapsack_P_1[i][it].getExpr();                    
-                    #ifndef WaitAfterOperate 
-                    expr_kP2_LHS = knapsack_D_3[i][it].getExpr();
-                    #endif 
-                }else{     //Discharging ports               
-                    expr_kD1_LHS = knapsack_D_1[i][it].getExpr();                     
-                    expr_kD2_LHS = knapsack_D_2[i][it].getExpr();                    
-                }
-
-				for(v=0;v<V;v++){										
-					for(t=k;t<=l;t++){						
-						#ifndef WaitAfterOperate
-						if(t>=tS && t<= tF)			//Variables of 'extended' interval
-							expr_kD2_LHS += oA[v][i][t];
-							expr_kP2_LHS += z[v][i][t];
-						#endif                        
-						#ifdef WaitAfterOperate
-						if(t>=tS && t<= tF)			//Variables of 'extended' interval
-							expr_kD2_LHS += z[v][i][t];
-						#endif                        
-						for(j=0;j<N;j++){													
-							if (j == N-1 && hasArc[v][i][j][t] == 1 && t>=tS)					//Sink arc departing after the last 'l'
-								expr_kP1_LHS += x[v][i][j][t];
-							else if (j > 0 && j < N-1){											//"Normal" arcs	
-								if(i != j){
-									int t2 = t+inst.travelTime[v][i-1][j-1];
-									if(hasArc[v][i][j][t] == 1 && (t2>=tS && t2<=tF) )  //If arc exists, was not added in the previous iteration and arrives at port j in the integer or relaxed block
-										expr_kP1_LHS += x[v][i][j][t];
-									if (t >= tS && t <= tF){									//If entering arc was not added in the previous iteration
-										if(t - inst.travelTime[v][j-1][i-1] >= 0){					//Only if it is possible an entering arc due the travel time
-											if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1)
-												expr_kD1_LHS += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			
-				for(t=k;t<=l;t++){ //Calculate kD1_RHS from scratch
-					kD1_RHS += inst.d_jt[i-1][t-1];
-				}				
-				kP2_RHS = ceil(kP1_RHS/inst.f_max_jt[i-1][0]);
-							
-				if(k==1)
-					kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0] - alphaUB;
-				else
-					kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0] - alphaUB;
-				kD2_RHS = ceil(kD1_RHS/inst.f_max_jt[i-1][0]);
-				kD1_RHS = ceil(kD1_RHS/inst.maxCapacity);
-				
-				if(inst.typePort[i-1] == 0){					
-					knapsack_P_1[i][it].setExpr(expr_kP1_LHS);					
-				}else{					
-					knapsack_D_1[i][it].setExpr(expr_kD1_LHS);
-					knapsack_D_1[i][it].setLB(kD1_RHS);					
-					knapsack_D_2[i][it].setExpr(expr_kD2_LHS);
-					knapsack_D_2[i][it].setLB(kD1_RHS);
-					#ifndef WaitAfterOperate					
-					knapsack_D_3[i][it].setExpr(expr_kP2_LHS);
-					knapsack_D_3[i][it].setLB(kD2_RHS);					
-					#endif
-				}				
-			}
-		}		
-	}
-	#endif
-        
+	    
     IloExpr expr_cumSlack(env), expr_berth(env), expr_invBalancePort(env);    
     IloExpr expr_sinkFlow(env), expr_1stLevel(env), expr_2ndLevel(env), expr_1stFlow(env), expr_2ndFlow(env);
 	for(v=0;v<V;v++){
@@ -1276,9 +1059,183 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 			if(v==0){
 				expr_cumSlack.clear();
 				expr_cumSlack = cumSlack[i].getExpr();
+				
+				#ifndef NKnapsackInequalities // TODO fix it!
+				int it,it2=0,k,l;
+				IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);
+				for(it=0;it <((T-3)*2 - (T-1-tF));it++){	//'Revise' existing inequalities (x variables) and add the new until [tF-1, tF]
+					double kP1_RHS=0, kP2_RHS=0, kD1_RHS=0, kD2_RHS=0, sum_alphaMax=0, alphaUB=0;
+					expr_kP1_LHS.clear();
+					expr_kP2_LHS.clear();
+					expr_kD1_LHS.clear();
+					expr_kD2_LHS.clear();
+					//Definining the size of set T =[k,l] - CAUTION: It is inverse of the paper of Agra et al (2013)
+					k=1;
+					l=tF;
+					if(it<tF-2){
+						l = it+2;
+						it2++;
+					}else if(it==tF-2){
+						it = T-3;
+						k = it2+4-l;
+						it2++;
+					}else{
+						k = it2+4-l;
+						it2++;
+					}            
+					if( (it >= tS-2 && it < tF-2) || (it > T-3 + tS-2) ){ //valid inequality is created from scratch - If it is in interval [1...[tS-2..tF-1]], or If it is in interval [[2..tS-1]...tF]
+						for(v=0;v<V;v++){
+							#ifdef WaitAfterOperate
+								expr_kP1_LHS += wB[v][i][k];
+							if(k>1 || hasEnteringArc1st[v][i][k-1]==1)      //TODO verificar se não deve ser &&
+								expr_kD1_LHS += w[v][i][k-1] + wB[v][i][k-1];
+							#endif
+							#ifndef WaitAfterOperate
+								expr_kP1_LHS += oB[v][i][k];
+
+							if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
+								expr_kD1_LHS += w[v][i][k-1] + oB[v][i][k-1];
+							#endif
+							#ifndef WaitAfterOperate
+							if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
+								expr_kD2_LHS += oB[v][i][k-1];
+							#endif
+							for(t=k;t<=l;t++){                       
+								expr_kP2_LHS += z[v][i][t];	//It is used for both loading and discharging ports
+								#ifndef WaitAfterOperate
+								expr_kD2_LHS += oA[v][i][t];
+								#endif
+								#ifdef WaitAfterOperate
+								expr_kD2_LHS += z[v][i][t];
+								#endif
+								for(j=0;j<N;j++){						
+									if(j==0 && inst.initialPort[v]+1 == i && t==inst.firstTimeAv[v]+1) 	//Source arc
+										expr_kD1_LHS += x[v][j][i][0];								
+									else if (j == N-1 && hasArc[v][i][j][t] == 1)						//Sink arc
+										expr_kP1_LHS += x[v][i][j][t];
+									else if (j > 0 && j < N-1){											//"Normal" arcs
+										if(i != j){
+											if(hasArc[v][i][j][t] == 1 && t+inst.travelTime[v][i-1][j-1] <= tF)  //If arc exists and arrives at port j in the integer or relaxed block
+												expr_kP1_LHS += x[v][i][j][t];
+											if(t - inst.travelTime[v][j-1][i-1] >= 0){					//Only if it is possible an entering arc due the travel time
+												if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1)
+													expr_kD1_LHS += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
+											}
+										}
+									}
+								}
+							}
+						}
+					
+						for(t=k;t<=l;t++){
+							kP1_RHS += inst.d_jt[i-1][t-1];
+							kD1_RHS += inst.d_jt[i-1][t-1];
+						}
+						kP1_RHS += -inst.sMax_jt[i-1][0];
+						kP2_RHS = ceil(kP1_RHS/inst.f_max_jt[i-1][0]);
+						kP1_RHS = ceil(kP1_RHS/inst.maxCapacity);
+						
+						if(k==1)
+							kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0];
+						else
+							kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0];
+						kD2_RHS = ceil(kD1_RHS/inst.f_max_jt[i-1][0]);
+						kD1_RHS = ceil(kD1_RHS/inst.maxCapacity);
+						
+						stringstream ss, ss1, ss2;
+						if(inst.typePort[i-1] == 0){
+							ss << "knpasackP1_" << i << "," << it;
+							knapsack_P_1[i][it] = IloRange(env, kP1_RHS, expr_kP1_LHS, IloInfinity, ss.str().c_str());
+							ss1 << "knapsackP2_" << i << "," << it;
+							knapsack_P_2[i][it] = IloRange(env, kP2_RHS, expr_kP2_LHS, IloInfinity, ss1.str().c_str());
+							model.add(knapsack_P_1[i][it]);
+							model.add(knapsack_P_2[i][it]);
+						}else{
+							ss << "knpasackD1_" << i << "," << it;
+							knapsack_D_1[i][it] = IloRange(env, kD1_RHS, expr_kD1_LHS, IloInfinity, ss.str().c_str());
+							ss1 << "knpasackD2_" << i << "," << it;
+							knapsack_D_2[i][it] = IloRange(env, kD1_RHS, expr_kD2_LHS, IloInfinity, ss1.str().c_str());
+							model.add(knapsack_D_1[i][it]);
+							model.add(knapsack_D_2[i][it]);
+							#ifndef WaitAfterOperate
+							ss2 << "knpasackD3_" << i << "," << it;
+							knapsack_D_3[i][it] = IloRange(env, kD2_RHS, expr_kP2_LHS, IloInfinity, ss2.str().c_str());
+							model.add(knapsack_D_3[i]);
+							#endif
+						}
+					}else if (it >= 0 && it < tS-2 ){		//Only modify the previously added valid inequalities of type [1..j] (only needed add x variables in the case of loading ports)
+						//Get the current expr values                 
+						if (inst.typePort[i-1] == 0){
+							expr_kP1_LHS = knapsack_P_1[i][it].getExpr();                    
+							#ifndef WaitAfterOperate 
+							expr_kP2_LHS = knapsack_D_3[i][it].getExpr();
+							#endif 
+						}else{     //Discharging ports               
+							expr_kD1_LHS = knapsack_D_1[i][it].getExpr();                     
+							expr_kD2_LHS = knapsack_D_2[i][it].getExpr();                    
+						}
+
+						for(v=0;v<V;v++){										
+							for(t=k;t<=l;t++){						
+								#ifndef WaitAfterOperate
+								if(t>=tS && t<= tF)			//Variables of 'extended' interval
+									expr_kD2_LHS += oA[v][i][t];
+									expr_kP2_LHS += z[v][i][t];
+								#endif                        
+								#ifdef WaitAfterOperate
+								if(t>=tS && t<= tF)			//Variables of 'extended' interval
+									expr_kD2_LHS += z[v][i][t];
+								#endif                        
+								for(j=0;j<N;j++){													
+									if (j == N-1 && hasArc[v][i][j][t] == 1 && t>=tS)					//Sink arc departing after the last 'l'
+										expr_kP1_LHS += x[v][i][j][t];
+									else if (j > 0 && j < N-1){											//"Normal" arcs	
+										if(i != j){
+											int t2 = t+inst.travelTime[v][i-1][j-1];
+											if(hasArc[v][i][j][t] == 1 && (t2>=tS && t2<=tF) )  //If arc exists, was not added in the previous iteration and arrives at port j in the integer or relaxed block
+												expr_kP1_LHS += x[v][i][j][t];
+											if (t >= tS && t <= tF){									//If entering arc was not added in the previous iteration
+												if(t - inst.travelTime[v][j-1][i-1] >= 0){					//Only if it is possible an entering arc due the travel time
+													if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1)
+														expr_kD1_LHS += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					
+						for(t=k;t<=l;t++){ //Calculate kD1_RHS from scratch
+							kD1_RHS += inst.d_jt[i-1][t-1];
+						}				
+						kP2_RHS = ceil(kP1_RHS/inst.f_max_jt[i-1][0]);
+									
+						if(k==1)
+							kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0] - alphaUB;
+						else
+							kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0] - alphaUB;
+						kD2_RHS = ceil(kD1_RHS/inst.f_max_jt[i-1][0]);
+						kD1_RHS = ceil(kD1_RHS/inst.maxCapacity);
+						
+						if(inst.typePort[i-1] == 0){					
+							knapsack_P_1[i][it].setExpr(expr_kP1_LHS);					
+						}else{					
+							knapsack_D_1[i][it].setExpr(expr_kD1_LHS);
+							knapsack_D_1[i][it].setLB(kD1_RHS);					
+							knapsack_D_2[i][it].setExpr(expr_kD2_LHS);
+							knapsack_D_2[i][it].setLB(kD1_RHS);
+							#ifndef WaitAfterOperate					
+							knapsack_D_3[i][it].setExpr(expr_kP2_LHS);
+							knapsack_D_3[i][it].setLB(kD2_RHS);					
+							#endif
+						}				
+					}
+				}
+				#endif		
 			}
 						
-			for(j=1;j<N;j++){//Considering ports and sink node								 
+			for(j=1;j<=N;j++){//Considering ports and sink node								 
 				if(j<=J)
 					t0 = max(1,tS-(int)inst.travelTime[v][i-1][j-1]);
 				else
@@ -1314,14 +1271,30 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 							sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
 							inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
 						model.add(portInventory[i][t]);
+						//Obj
+						expr_obj_cost += inst.p_jt[i-1][t-1]*alpha[i][t];								//4rd term
+						#ifndef NBetas
+						expr_obj_cost += 1000*beta[i][t];										//Auxiliary variables
+						#endif
 					}
 					///end Port-time iterator
-										
+					
+					///Vessel port time iterator (v,i,t)
+					if(j==1 && t>=tS){
+						if(hasEnteringArc1st[v][i][t]==1){
+							expr_obj_revenue += inst.r_jt[i-1][t-1]*f[v][i][t];						//1st term
+							expr_obj_cost += (t-1)*inst.attemptCost*z[v][i][t];						//3rd term				
+						}
+					}					
+					///end vessel port time iterator (v,i,t)
+					
 					stringstream ss, ss1, ss2;
 					ss2 << "flowLimitX_" << v << "," << i << "," << j << "," << t;      
 					if (j<=J){				//When j is a port
 						int t2 = t + inst.travelTime[v][i-1][j-1];
 						if(t2>=tS && t2<=tF){ // Arc in the new added block or in the intersection with new block and previous interval
+							//Obj - traveling arcs
+							expr_obj_cost += arcCost[v][i][j][t]*x[v][i][j][t];							
 							if(inst.typePort[i-1] == 0 && inst.typePort[j-1] == 1){
 								ss << "travelAtCap_(" << i << "," << j << ")_" << t << "," << v;
 								travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);
@@ -1340,6 +1313,8 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 						}
 					}else{ // when j is the sink node
 						if(t >= tS){ //Only for nodes in the current added block
+							//Obj
+							expr_obj_cost += arcCost[v][i][j][t]*x[v][i][j][t];
 							if(inst.typePort[i-1] == 0){
 								ss << "travelAtCap_(" << i << ",snk)_" << t << "," << v;
 								travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);	
@@ -1351,10 +1326,9 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 								travelEmpty[v][i][j][t].setName(ss1.str().c_str());
 								model.add(travelEmpty[v][i][j][t]);
 							}
-							if(i != j){
-								flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss2.str().c_str());
-								model.add(flowCapacityX[v][i][j][t]);
-							}
+							
+							flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss2.str().c_str());
+							model.add(flowCapacityX[v][i][j][t]);
 						}
 					}
 				}
@@ -1384,15 +1358,15 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 					ss3 << "First_level_flow_" << v << "(" << i << "," << t << ")";
 					ss4 << "Second_level_flow_" << v << "(" << i << "," << t << ")";
 					
-					if(hasArc[v][i][N-1][t]==1)
-						expr_sinkFlow += x[v][i][N-1][t];
+					if(hasArc[v][i][N][t]==1)
+						expr_sinkFlow += x[v][i][N][t];
 					
 					expr_1stLevel.clear();
 					expr_1stFlow.clear();
 					expr_2ndLevel.clear();
 					expr_2ndFlow.clear();                        
-					for(int j1=0;j1<N;j1++){
-						if(j1>0 && j1<N-1){ //No consider sink arc (first level balance)
+					for(int j1=0;j1<=N;j1++){
+						if(j1>0 && j1<N){ //No consider sink arc (first level balance)
 							if (t - inst.travelTime[v][j1-1][i-1] >= 0){ //If it is possible to exist an arc from j1 to i
 								if(hasArc[v][j1][i][t-inst.travelTime[v][j1-1][i-1]] == 1){ //If the arc exists
 									expr_1stLevel += x[v][j1][i][t-inst.travelTime[v][j1-1][i-1]];
@@ -1402,7 +1376,7 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 						}
 						if(j1>0){ //No consider source arc (second level balance)
 							if (hasArc[v][i][j1][t] == 1){
-								if(j1 == N-1){ //If j1 is the sink node, add to expr
+								if(j1 == N){ //If j1 is the sink node, add to expr
 									expr_2ndLevel += x[v][i][j1][t];
 									expr_2ndFlow += fX[v][i][j1][t];
 								}else if (t + inst.travelTime[v][i-1][j1-1] <= tF){ //If j1 is a port, it is necessary that the arrival is in the model
@@ -1533,14 +1507,20 @@ void Model::decreaseEndBlock (IloEnv& env, Instance inst, const double& nInterva
 		}
 		sinkNodeBalance[v].setExpr(expr_sinkFlow);
 	}
-	expr_1stLevel.end();
-	expr_2ndLevel.end();
-	expr_1stFlow.end();
-	expr_2ndFlow.end();
-	expr_sinkFlow.end();
-    expr_cumSlack.end(); 
-    expr_berth.end();
-    expr_invBalancePort.end();    
+	//New objective
+	obj.setExpr(expr_obj_current + expr_obj_cost - expr_obj_revenue);
+	
+	//~ expr_obj_current.end();
+    //~ expr_obj_cost.end();
+    //~ expr_obj_revenue.end();	
+	//~ expr_1stLevel.end();
+	//~ expr_2ndLevel.end();
+	//~ expr_1stFlow.end();
+	//~ expr_2ndFlow.end();
+	//~ expr_sinkFlow.end();
+    //~ expr_cumSlack.end(); 
+    //~ expr_berth.end();
+    //~ expr_invBalancePort.end();    
 
 	#ifndef NBranching
 		
@@ -1619,124 +1599,7 @@ void Model::reIntegralize(IloEnv& env, Instance inst, const int& tS, const int& 
 	}
 }
 
-//~ void Model::fixAllSolution(IloEnv& env,const Instance& inst){
-	//~ if((cplex.getStatus() == IloAlgorithm::Optimal) || (cplex.getStatus() == IloAlgorithm::Feasible)){				
-		//~ getSolVals(env, inst);			
-		//~ //Fix solution		
-		//~ for(int v=0; v<inst.speed.getSize(); v++){
-			//~ #ifndef NFixZvar
-			//~ for(int j=0; j<inst.numTotalPorts; j++){							
-				//~ for(int t=0; t<inst.t; t++){								
-					//~ z[v][j][t].setBounds(round(zValue[v][j][t]), round(zValue[v][j][t]));					
-				//~ }
-			//~ }
-			//~ #endif
-			//~ //Fixing X variables
-			//~ for(int a=0; a<x[v].getSize(); a++){				
-				//~ x[v][a].setBounds(round(xValue[v][a]), round(xValue[v][a]));			   
-			//~ }						
-			//~ #ifndef NOperateAndGo2
-			//~ for(int t=0; t<inst.t; t++){
-				//~ w[v][t].setBounds(round(wValue[v][t]), round(wValue[v][t]));
-			//~ }
-			//~ #endif
-		//~ }		
-	//~ }else{//If the method return a infeasible solution
-		//~ //TODO
-		//~ cout << "No  feasile solution" << endl;
-		//~ exit(1);
-	//~ }
-//~ }
 
-//~ void Model::unFixInterval(Instance inst, const int& tS, const int& tF){
-	//~ //Unfixing z
-	//~ for(int v=0; v<inst.speed.getSize(); v++){
-		//~ #ifndef NFixZvar
-		//~ for(int j=0; j<inst.numTotalPorts; j++){							
-			//~ for(int t=tS; t<tF; t++){								
-				//~ z[v][j][t].setBounds(0, 1);					
-			//~ }
-		//~ }
-		//~ #endif
-		//~ //Unfixing X variables
-		//~ for(int a=0; a<x[v].getSize(); a++){
-			//~ int t1,t2, arcType;		
-			//~ arcType = inst.travelArcType(inst.arcs[v][a],t1,t2);	
-			//~ if( (t2 >= tS && t2 < tF) ||  // Arc times are between relaxed times and before 				
-				//~ ((arcType == 3 || arcType == 4) && (t1 >= tS && t1 < tF)) ){ //Is a sink arc in the interval 
-				//~ x[v][a].setBounds(0, 1);
-		   //~ }
-		//~ }		
-	//~ }
-//~ }
-/*Pre-req: Fix All solution*/
-//~ void Model::improvementPhase(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,
-//~ const double& timeLimit, float& elapsed_time, double& incumbent){	
-	//~ double prevObj = 1.0e+10;
-	//~ double objValue = incumbent;
-	//~ int i;			
-	//~ Timer<chrono::milliseconds> timer_LS;
-	//~ timer_LS.start();
-	//~ cplex.setParam(IloCplex::TiLim, min(timePerIter, max(timeLimit-elapsed_time/1000,0.0)));
-	//~ if (gap > 1e-04)
-		//~ cplex.setParam(IloCplex::EpGap, gap/100);
-	//~ int tS, tF;
-	//~ while((prevObj - objValue > 0.0001) && elapsed_time/1000 < timeLimit){				
-		//~ for(i=1;i<=ceil(mIntervals*(1+overlap/100));i++){
-			//~ if(i==1)
-				//~ tS = inst.t/mIntervals*(i-1);							
-			//~ else
-				//~ tS = inst.t/mIntervals*(i-1)*(1-overlap/100);						
-			//~ tF = min(tS+inst.t/mIntervals, (double)inst.t);
-			//~ cout << "Unfixing " << tS << "..." << tF << endl;
-			//~ unFixInterval(inst, tS, tF);
-			//~ 
-			//~ cplex.setParam(IloCplex::TiLim, min(timePerIter, max(timeLimit-elapsed_time/1000,0.0)));
-			//~ timer_cplex.start();
-			//~ cplex.solve();
-			//~ opt_time += timer_cplex.total();
-			//~ elapsed_time += timer_LS.total();			
-			//~ incumbent = cplex.getObjValue();
-			//~ if(elapsed_time/1000 >= timeLimit){
-				//~ cout << "Reached LS time limit " << timeLimit << ": " << elapsed_time/1000 << endl;
-				//~ break;
-			//~ }
-			//~ timer_LS.start();						
-			//~ cout << "Objective: " << incumbent << endl;
-			//~ // //~ if (i < ceil(mIntervals*(1+overlap/100))){
-				//~ cout << "Re-fixing " << tS << "..." << tF;
-				//~ fixSolution(env, inst, tS, tF,0);	 //Does not fix the last interval either the sink arcs
-				//~ cout << ". Done! " << endl;
-			//~ // //~ }			
-		//~ }
-		//~ prevObj = objValue;
-		//~ objValue = incumbent;		
-		//~ if(elapsed_time/1000 >= timeLimit){
-			//~ cout << "Reached LS time limit " << timeLimit << ": " << elapsed_time/1000 << endl;
-			//~ break;
-		//~ }				
-	//~ }
-//~ }
-
-//~ void Model::getSolVals(IloEnv& env, const Instance& inst){
-	//~ if((cplex.getStatus() == IloAlgorithm::Optimal) || (cplex.getStatus() == IloAlgorithm::Feasible)){				
-		//~ for(int v=0;v<inst.speed.getSize();v++){
-			//~ xValue[v] = IloNumArray(env, xValue.getSize());			
-			//~ cplex.getValues(x[v], xValue[v]);			
-			//~ for(int j=0; j<inst.numTotalPorts; j++){				
-				//~ zValue[v][j] = IloNumArray(env, zValue[v][j].getSize());				
-				//~ cplex.getValues(z[v][j], zValue[v][j]);
-			//~ }
-			//~ #ifndef NOperateAndGo2
-			//~ //wValue[v] = IloNumArray(env, wValue.getSize());			
-			//~ // cplex.getValues(w[v], wValue[v]);			
-			//~ #endif
-		//~ }
-	//~ }else{
-		//~ cout << "Impossible to get feasible solution values!" << endl;
-		//~ exit(1);
-	//~ }
-//~ }
 void Model::getSolValsW(IloEnv& env, Instance inst, const int& tS, const int& tF){
 	if((cplex.getStatus() == IloAlgorithm::Optimal) || (cplex.getStatus() == IloAlgorithm::Feasible)){
 		int v, i, j, t, t0;
@@ -1805,15 +1668,648 @@ void Model::getSolValsW(IloEnv& env, Instance inst, const int& tS, const int& tF
 }
 
 void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const int& tS_fix, const int& tF_fix, const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int){
-	int J = inst.numTotalPorts;
-	int N = J+1;
+	int i,j,t,v,a, t0;
 	int T = inst.t;
+	int timePerInterval = T/nIntervals; //Number of time periods in each interval
+	int J = inst.numTotalPorts;	
+	double intPart;	
+	int V = inst.speed.getSize(); //# of vessels
+    int N = J + 1;    
 	
 	//First gets the solution values for fixing (when needed)
 	if (tS_fix < T){		
 		cout << "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
 		getSolValsW(env, inst, tS_fix, tF_fix);	//Get only values of the interval for fixing
 	}                
+	
+	if (tS_int <= T)
+		cout << "Integralizing: [" << tS_int << "," << tF_int << "]\n";
+	
+	///Removing end-block
+	if(tS_add <= T)
+		cout << "Adding to the model [" << tS_add << "," << tF_add << "]\n";
+		
+	
+	
+    ///Objective function	
+	IloExpr expr_obj_current = cplex.getObjective().getExpr(); //Gets the current objective function
+	IloExpr expr_obj_cost(env);
+	IloExpr expr_obj_revenue(env);
+			
+	IloExpr expr_cumSlack(env), expr_berth(env), expr_invBalancePort(env);    
+	IloExpr expr_sinkFlow(env), expr_1stLevel(env), expr_2ndLevel(env), expr_1stFlow(env), expr_2ndFlow(env);
+	
+	for(v=0;v<V;v++){
+		if(tS_add <= T){
+			expr_sinkFlow.clear();
+			expr_sinkFlow = sinkNodeBalance[v].getExpr();
+		}
+		for(i=1;i<=J;i++){			
+			//Fixing values of last index of previous fixed block (if is not first iteration)
+            if(tS_fix>1){
+                if(hasEnteringArc1st[v][i][tS_fix-1]){
+                    w[v][i][tS_fix-1].setBounds(round(wValue[v][i][tS_fix-1]), round(wValue[v][i][tS_fix-1]));
+                    #ifdef WaitAfterOperate
+                    wB[v][i][tS_fix-1].setBounds(round(wBValue[v][i][tS_fix-1]), round(wBValue[v][i][tS_fix-1]));
+                    #endif
+                    #ifndef WaitAfterOperate
+                    oB[v][i][tS_fix-1].setBounds(round(oBValue[v][i][tS_fix-1]), round(oBValue[v][i][tS_fix-1]));
+                    #endif
+                }
+            }
+			
+			//Integralizing the last index of previous block
+			if (tS_int <= T){				
+				model.remove(convertW[v][i][tS_int-1]);
+				#ifndef WaitAfterOperate
+				model.remove(convertOB[v][i][tS_int-1]);
+				#endif
+				#ifdef WaitAfterOperate
+				model.remove(convertWB[v][i][tS_int-1]);
+				#endif
+			}
+            
+            ///Updating flows and limits of last time period of previous interval            			
+			if(tS_add <= T){				
+				expr_1stLevel.clear();
+				expr_2ndLevel.clear();
+				expr_1stFlow.clear();
+				expr_2ndFlow.clear();			
+				
+				if(hasEnteringArc1st[v][i][tS_add-1]==1){ //Only necessary if there is entering arc in the node
+					expr_1stLevel = firstLevelBalance[v][i][tS_add-1].getExpr();
+					expr_2ndLevel = secondLevelBalance[v][i][tS_add-1].getExpr();
+					expr_1stFlow = firstLevelFlow[v][i][tS_add-1].getExpr();
+					expr_2ndFlow = secondLevelFlow[v][i][tS_add-1].getExpr();
+					
+					expr_1stLevel += - w[v][i][tS_add-1];
+					expr_1stFlow += -fW[v][i][tS_add-1];
+					
+					#ifndef WaitAfterOperate                
+					expr_2ndLevel += oB[v][i][tS_add-1];
+					expr_2ndFlow += fOB[v][i][tS_add-1];
+					#endif
+					
+					#ifdef WaitAfterOperate
+					expr_2ndLevel += wB[v][i][tS_add-1];
+					expr_2ndFlow += fWB[v][i][tS_add-1];
+					#endif
+					
+					firstLevelBalance[v][i][tS_add-1].setExpr(expr_1stLevel);
+					firstLevelFlow[v][i][tS_add-1].setExpr(expr_1stFlow);
+					secondLevelBalance[v][i][tS_add-1].setExpr(expr_2ndLevel);
+					secondLevelFlow[v][i][tS_add-1].setExpr(expr_2ndFlow);
+				}
+			
+				//Add constraints on the flow variables of last time period of previous block.
+				stringstream ss8,ss9,ss10;
+				#ifndef WaitAfterOperate
+				ss8 << "flowLimitOB_"<<v<<","<<i<<","<<tS_add-1;
+				flowCapacityOB[v][i][tS_add-1] = IloRange(env, -IloInfinity, fOB[v][i][tS_add-1]-inst.q_v[v]*oB[v][i][tS_add-1], 0, ss8.str().c_str());
+				model.add(flowCapacityOB[v][i][tS_add-1]);                            
+				#endif
+				ss9 << "flowLimitW_"<<v<<","<<i<<","<<tS_add-1;
+				flowCapacityW[v][i][tS_add-1] = IloRange(env, -IloInfinity, fW[v][i][tS_add-1]-inst.q_v[v]*w[v][i][tS_add-1], 0, ss9.str().c_str());
+				model.add(flowCapacityW[v][i][tS_add-1]);
+				#ifdef WaitAfterOperate
+				ss10 << "flowLimitWB_"<<v<<","<<i<<","<<tS_add-1;
+				flowCapacityWB[v][i][tS_add-1] = IloRange(env, -IloInfinity, fWB[v][i][tS_add-1]-inst.q_v[v]*wB[v][i][tS_add-1], 0, ss10.str().c_str());
+				model.add(flowCapacityWB[v][i][tS_add-1]);
+				#endif
+			}
+			///end updating    
+						
+			///port iterator (i)
+			if(v==0){
+				if(tS_add <= T){
+					expr_cumSlack.clear();
+					expr_cumSlack = cumSlack[i].getExpr();
+					
+					#ifndef NKnapsackInequalities // TODO fix it!
+					int it,it2=0,k,l;
+					IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);
+					for(it=0;it <((T-3)*2 - (T-1-tF));it++){	//'Revise' existing inequalities (x variables) and add the new until [tF-1, tF]
+						double kP1_RHS=0, kP2_RHS=0, kD1_RHS=0, kD2_RHS=0, sum_alphaMax=0, alphaUB=0;
+						expr_kP1_LHS.clear();
+						expr_kP2_LHS.clear();
+						expr_kD1_LHS.clear();
+						expr_kD2_LHS.clear();
+						//Definining the size of set T =[k,l] - CAUTION: It is inverse of the paper of Agra et al (2013)
+						k=1;
+						l=tF;
+						if(it<tF-2){
+							l = it+2;
+							it2++;
+						}else if(it==tF-2){
+							it = T-3;
+							k = it2+4-l;
+							it2++;
+						}else{
+							k = it2+4-l;
+							it2++;
+						}            
+						if( (it >= tS-2 && it < tF-2) || (it > T-3 + tS-2) ){ //valid inequality is created from scratch - If it is in interval [1...[tS-2..tF-1]], or If it is in interval [[2..tS-1]...tF]
+							for(v=0;v<V;v++){
+								#ifdef WaitAfterOperate
+									expr_kP1_LHS += wB[v][i][k];
+								if(k>1 || hasEnteringArc1st[v][i][k-1]==1)      //TODO verificar se não deve ser &&
+									expr_kD1_LHS += w[v][i][k-1] + wB[v][i][k-1];
+								#endif
+								#ifndef WaitAfterOperate
+									expr_kP1_LHS += oB[v][i][k];
+
+								if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
+									expr_kD1_LHS += w[v][i][k-1] + oB[v][i][k-1];
+								#endif
+								#ifndef WaitAfterOperate
+								if(k>1 || hasEnteringArc1st[v][i][k-1]==1)
+									expr_kD2_LHS += oB[v][i][k-1];
+								#endif
+								for(t=k;t<=l;t++){                       
+									expr_kP2_LHS += z[v][i][t];	//It is used for both loading and discharging ports
+									#ifndef WaitAfterOperate
+									expr_kD2_LHS += oA[v][i][t];
+									#endif
+									#ifdef WaitAfterOperate
+									expr_kD2_LHS += z[v][i][t];
+									#endif
+									for(j=0;j<N;j++){						
+										if(j==0 && inst.initialPort[v]+1 == i && t==inst.firstTimeAv[v]+1) 	//Source arc
+											expr_kD1_LHS += x[v][j][i][0];								
+										else if (j == N-1 && hasArc[v][i][j][t] == 1)						//Sink arc
+											expr_kP1_LHS += x[v][i][j][t];
+										else if (j > 0 && j < N-1){											//"Normal" arcs
+											if(i != j){
+												if(hasArc[v][i][j][t] == 1 && t+inst.travelTime[v][i-1][j-1] <= tF)  //If arc exists and arrives at port j in the integer or relaxed block
+													expr_kP1_LHS += x[v][i][j][t];
+												if(t - inst.travelTime[v][j-1][i-1] >= 0){					//Only if it is possible an entering arc due the travel time
+													if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1)
+														expr_kD1_LHS += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
+												}
+											}
+										}
+									}
+								}
+							}
+						
+							for(t=k;t<=l;t++){
+								kP1_RHS += inst.d_jt[i-1][t-1];
+								kD1_RHS += inst.d_jt[i-1][t-1];
+							}
+							kP1_RHS += -inst.sMax_jt[i-1][0];
+							kP2_RHS = ceil(kP1_RHS/inst.f_max_jt[i-1][0]);
+							kP1_RHS = ceil(kP1_RHS/inst.maxCapacity);
+							
+							if(k==1)
+								kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0];
+							else
+								kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0];
+							kD2_RHS = ceil(kD1_RHS/inst.f_max_jt[i-1][0]);
+							kD1_RHS = ceil(kD1_RHS/inst.maxCapacity);
+							
+							stringstream ss, ss1, ss2;
+							if(inst.typePort[i-1] == 0){
+								ss << "knpasackP1_" << i << "," << it;
+								knapsack_P_1[i][it] = IloRange(env, kP1_RHS, expr_kP1_LHS, IloInfinity, ss.str().c_str());
+								ss1 << "knapsackP2_" << i << "," << it;
+								knapsack_P_2[i][it] = IloRange(env, kP2_RHS, expr_kP2_LHS, IloInfinity, ss1.str().c_str());
+								model.add(knapsack_P_1[i][it]);
+								model.add(knapsack_P_2[i][it]);
+							}else{
+								ss << "knpasackD1_" << i << "," << it;
+								knapsack_D_1[i][it] = IloRange(env, kD1_RHS, expr_kD1_LHS, IloInfinity, ss.str().c_str());
+								ss1 << "knpasackD2_" << i << "," << it;
+								knapsack_D_2[i][it] = IloRange(env, kD1_RHS, expr_kD2_LHS, IloInfinity, ss1.str().c_str());
+								model.add(knapsack_D_1[i][it]);
+								model.add(knapsack_D_2[i][it]);
+								#ifndef WaitAfterOperate
+								ss2 << "knpasackD3_" << i << "," << it;
+								knapsack_D_3[i][it] = IloRange(env, kD2_RHS, expr_kP2_LHS, IloInfinity, ss2.str().c_str());
+								model.add(knapsack_D_3[i]);
+								#endif
+							}
+						}else if (it >= 0 && it < tS-2 ){		//Only modify the previously added valid inequalities of type [1..j] (only needed add x variables in the case of loading ports)
+							//Get the current expr values                 
+							if (inst.typePort[i-1] == 0){
+								expr_kP1_LHS = knapsack_P_1[i][it].getExpr();                    
+								#ifndef WaitAfterOperate 
+								expr_kP2_LHS = knapsack_D_3[i][it].getExpr();
+								#endif 
+							}else{     //Discharging ports               
+								expr_kD1_LHS = knapsack_D_1[i][it].getExpr();                     
+								expr_kD2_LHS = knapsack_D_2[i][it].getExpr();                    
+							}
+
+							for(v=0;v<V;v++){										
+								for(t=k;t<=l;t++){						
+									#ifndef WaitAfterOperate
+									if(t>=tS && t<= tF)			//Variables of 'extended' interval
+										expr_kD2_LHS += oA[v][i][t];
+										expr_kP2_LHS += z[v][i][t];
+									#endif                        
+									#ifdef WaitAfterOperate
+									if(t>=tS && t<= tF)			//Variables of 'extended' interval
+										expr_kD2_LHS += z[v][i][t];
+									#endif                        
+									for(j=0;j<N;j++){													
+										if (j == N-1 && hasArc[v][i][j][t] == 1 && t>=tS)					//Sink arc departing after the last 'l'
+											expr_kP1_LHS += x[v][i][j][t];
+										else if (j > 0 && j < N-1){											//"Normal" arcs	
+											if(i != j){
+												int t2 = t+inst.travelTime[v][i-1][j-1];
+												if(hasArc[v][i][j][t] == 1 && (t2>=tS && t2<=tF) )  //If arc exists, was not added in the previous iteration and arrives at port j in the integer or relaxed block
+													expr_kP1_LHS += x[v][i][j][t];
+												if (t >= tS && t <= tF){									//If entering arc was not added in the previous iteration
+													if(t - inst.travelTime[v][j-1][i-1] >= 0){					//Only if it is possible an entering arc due the travel time
+														if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1)
+															expr_kD1_LHS += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						
+							for(t=k;t<=l;t++){ //Calculate kD1_RHS from scratch
+								kD1_RHS += inst.d_jt[i-1][t-1];
+							}				
+							kP2_RHS = ceil(kP1_RHS/inst.f_max_jt[i-1][0]);
+										
+							if(k==1)
+								kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0] - alphaUB;
+							else
+								kD1_RHS += -inst.sMax_jt[i-1][k-1] + inst.sMin_jt[i-1][0] - alphaUB;
+							kD2_RHS = ceil(kD1_RHS/inst.f_max_jt[i-1][0]);
+							kD1_RHS = ceil(kD1_RHS/inst.maxCapacity);
+							
+							if(inst.typePort[i-1] == 0){					
+								knapsack_P_1[i][it].setExpr(expr_kP1_LHS);					
+							}else{					
+								knapsack_D_1[i][it].setExpr(expr_kD1_LHS);
+								knapsack_D_1[i][it].setLB(kD1_RHS);					
+								knapsack_D_2[i][it].setExpr(expr_kD2_LHS);
+								knapsack_D_2[i][it].setLB(kD1_RHS);
+								#ifndef WaitAfterOperate					
+								knapsack_D_3[i][it].setExpr(expr_kP2_LHS);
+								knapsack_D_3[i][it].setLB(kD2_RHS);					
+								#endif
+							}				
+						}
+					}
+					#endif		
+				}
+			}
+						
+			for(j=1;j<=N;j++){//Considering ports and sink node								 
+				if(j<=J)
+					t0 = max(1,tS_fix-(int)inst.travelTime[v][i-1][j-1]);
+				else
+					t0 = tS_fix;
+				
+				for(t=t0;t<=tF_add;t++){
+					///Port-time iterator
+					if(v==0 && j==1){
+						//For decreaseEndBlock
+						if(tS_add <= T){
+							if(t>=tS_add){
+								expr_berth.clear();
+								expr_invBalancePort.clear();
+								stringstream ss, ss2;
+								ss << "berthLimit_(" << i << "," << t << ")";
+								bool emptyExpr = true;
+								for(int v1=0;v1<V;v1++){
+									if (hasEnteringArc1st[v1][i][t]==1){ //Only if exists an entering arc in the node
+										expr_berth += z[v1][i][t];
+										emptyExpr = false;
+									}
+									expr_invBalancePort += -f[v1][i][t];
+								}
+								if(!emptyExpr){ //Only if there are some Z variable in the expr
+									berthLimit[i][t] = IloRange(env,-IloInfinity, expr_berth, inst.b_j[i-1], ss.str().c_str());
+									model.add(berthLimit[i][t]);
+								}
+								
+								expr_cumSlack += alpha[i][t];
+								expr_invBalancePort += -alpha[i][t];
+								#ifndef NBetas
+								expr_invBalancePort += -beta[i][t];
+								#endif
+								ss2 << "invBalancePort_(" << i << "," << t << ")";
+								portInventory[i][t] = IloRange(env, inst.delta[i-1]*inst.d_jt[i-1][t-1],
+									sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
+									inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
+								model.add(portInventory[i][t]);
+								//Obj
+								expr_obj_cost += inst.p_jt[i-1][t-1]*alpha[i][t];								//4rd term
+								#ifndef NBetas
+								expr_obj_cost += 1000*beta[i][t];										//Auxiliary variables
+								#endif
+							}
+						}
+					}
+					///end Port-time iterator
+					
+					///Vessel port time iterator (v,i,t)
+					if(j==1){
+						//For fixing
+						if(t<=tF_fix){
+							if(hasEnteringArc1st[v][i][t]){
+								if(t>=tS_fix){ //Fixing values only of the current block                        
+									z[v][i][t].setBounds(round(zValue[v][i][t]), round(zValue[v][i][t]));
+									if(t<tF_fix){
+										w[v][i][t].setBounds(round(wValue[v][i][t]), round(wValue[v][i][t]));
+										#ifdef WaitAfterOperate
+										wB[v][i][t].setBounds(round(wBValue[v][i][t]), round(wBValue[v][i][t]));
+										#endif
+										#ifndef WaitAfterOperate
+										oB[v][i][t].setBounds(round(oBValue[v][i][t]), round(oBValue[v][i][t]));
+										#endif
+									}
+									#ifndef WaitAfterOperate
+									oA[v][i][t].setBounds(round(oAValue[v][i][t]), round(oAValue[v][i][t]));
+									#endif
+									
+									#ifndef NFixSinkArc
+									x[v][i][N][t].setBounds(round(xValue[v][i][N][t]), round(xValue[v][i][N][t]));
+									#endif
+								}							
+							}
+						}
+						
+						//For integralizing block
+						if(tS_int<=T){
+							if(t>=tS_int && t<=tF_int){
+								model.remove(convertZ[v][i][t]);
+								#ifndef WaitAfterOperate
+								model.remove(convertOA[v][i][t]);
+								#endif
+								if(t<tF_int){
+									model.remove(convertW[v][i][t]);
+									#ifndef WaitAfterOperate
+									model.remove(convertOB[v][i][t]);
+									#endif
+									#ifdef WaitAfterOperate
+									model.remove(convertWB[v][i][t]);
+									#endif
+								}
+							}
+						}
+						//For decreaseEndBlock
+						if(tS_add <= T){
+							if(t>=tS_add){
+								if(hasEnteringArc1st[v][i][t]==1){
+									expr_obj_revenue += inst.r_jt[i-1][t-1]*f[v][i][t];						//1st term
+									expr_obj_cost += (t-1)*inst.attemptCost*z[v][i][t];						//3rd term				
+								}
+							}
+						}						
+					}					
+					///end vessel port time iterator (v,i,t)					
+					stringstream ss, ss1, ss2;
+					ss2 << "flowLimitX_" << v << "," << i << "," << j << "," << t;					
+					if (j<=J){				//When j is a port
+						int t2 = t + inst.travelTime[v][i-1][j-1];
+						//For decreaseEndBlock
+						if(tS_add <= T){
+							if(t2>=tS_add && t2<=tF_add){ // Arc in the new added block or in the intersection with new block and previous interval
+								//Obj - traveling arcs
+								expr_obj_cost += arcCost[v][i][j][t]*x[v][i][j][t];							
+								if(inst.typePort[i-1] == 0 && inst.typePort[j-1] == 1){
+									ss << "travelAtCap_(" << i << "," << j << ")_" << t << "," << v;
+									travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);
+									travelAtCapacity[v][i][j][t].setName(ss.str().c_str());
+									model.add(travelAtCapacity[v][i][j][t]);
+								}else if (inst.typePort[i-1] == 1 && inst.typePort[j-1] == 0){
+									ss1 << "travelEmpty_(" << i << "," << j << ")_" << t << "," << v;
+									travelEmpty[v][i][j][t].setExpr(inst.q_v[v]*x[v][i][j][t] + fX[v][i][j][t]);
+									travelEmpty[v][i][j][t].setName(ss1.str().c_str());
+									model.add(travelEmpty[v][i][j][t]);
+								}
+								if (i != j){
+									flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss2.str().c_str());
+									model.add(flowCapacityX[v][i][j][t]);
+								}
+							}
+						}
+						//For integralizingBlock
+						if(tS_int <= T){
+							if(t2>=tS_int && t2<=tF_int)
+								model.remove(convertX[v][i][j][t]);
+						}
+						//For fixing block
+						if (t2>= tS_fix && t2 <= tF_fix) 
+							x[v][i][j][t].setBounds(round(xValue[v][i][j][t]), round(xValue[v][i][j][t]));
+					}else{ // when j is the sink node
+						//For decreaseEndBlock
+						if(tS_add <= T){
+							if(t >= tS_add){ //Only for nodes in the current added block
+								//Obj
+								expr_obj_cost += arcCost[v][i][j][t]*x[v][i][j][t];
+								if(inst.typePort[i-1] == 0){
+									ss << "travelAtCap_(" << i << ",snk)_" << t << "," << v;
+									travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);	
+									travelAtCapacity[v][i][j][t].setName(ss.str().c_str());
+									model.add(travelAtCapacity[v][i][j][t]);
+								}else if (inst.typePort[i-1] == 1){ 
+									ss1 << "travelEmpty_(" << i << ",snk)_" << t << "," << v;
+									travelEmpty[v][i][j][t].setExpr(inst.q_v[v]*x[v][i][j][t] + fX[v][i][j][t]);
+									travelEmpty[v][i][j][t].setName(ss1.str().c_str());
+									model.add(travelEmpty[v][i][j][t]);
+								}
+								
+								flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss2.str().c_str());
+								model.add(flowCapacityX[v][i][j][t]);
+							}
+						}
+						//For integralizingBlock
+						if(tS_int <= T){
+							if (t >= tS_int && t <= tF_int)
+								model.remove(convertX[v][i][j][t]);
+						}
+					}
+				}
+			}
+			///Need another time iterator (v,i,t) - only for decrease endBlock
+			if(tS_add <= T){
+				t0 = max(1, tS_add-(int)inst.max_travelTime[v]);
+				for(t=t0;t<=tF_add;t++){
+					if(t<tS_add){   ///Needed for update outgoing flow balance arcs (just 2nd level)
+						expr_2ndLevel = secondLevelBalance[v][i][t].getExpr();
+						expr_2ndFlow = secondLevelFlow[v][i][t].getExpr();
+						for(int j1=1;j1<=J;j1++){
+							if (hasArc[v][i][j1][t] == 1){
+								if (t + inst.travelTime[v][i-1][j1-1] >= tS_add && t + inst.travelTime[v][i-1][j1-1] <= tF_add){ //If arc departs from previos interval (t<tS) and arrive in the current interval
+									expr_2ndLevel += x[v][i][j1][t];
+									expr_2ndFlow += fX[v][i][j1][t];
+								}
+							}
+						}
+						//Updating previous flow 2nd level
+						secondLevelBalance[v][i][t].setExpr(expr_2ndLevel);
+						secondLevelFlow[v][i][t].setExpr(expr_2ndFlow);
+					}else{ /// if t>= tS_add : Only considering the time-periods of the added interval
+						stringstream ss, ss1, ss2, ss3, ss4, ss5, ss6, ss7, ss8, ss9, ss10;
+						ss << "First_level_balance_" << v << "(" << i << "," << t << ")";
+						ss1 << "Second_level_balance_" << v << "(" << i << "," << t << ")";
+						ss2 << "link_balance_" << v << "(" << i << "," << t << ")";
+						ss3 << "First_level_flow_" << v << "(" << i << "," << t << ")";
+						ss4 << "Second_level_flow_" << v << "(" << i << "," << t << ")";
+						
+						if(hasArc[v][i][N][t]==1)
+							expr_sinkFlow += x[v][i][N][t];
+						
+						expr_1stLevel.clear();
+						expr_1stFlow.clear();
+						expr_2ndLevel.clear();
+						expr_2ndFlow.clear();                        
+						for(int j1=0;j1<=N;j1++){
+							if(j1>0 && j1<N){ //No consider sink arc (first level balance)
+								if (t - inst.travelTime[v][j1-1][i-1] >= 0){ //If it is possible to exist an arc from j1 to i
+									if(hasArc[v][j1][i][t-inst.travelTime[v][j1-1][i-1]] == 1){ //If the arc exists
+										expr_1stLevel += x[v][j1][i][t-inst.travelTime[v][j1-1][i-1]];
+										expr_1stFlow += fX[v][j1][i][t-inst.travelTime[v][j1-1][i-1]];
+									}
+								}
+							}
+							if(j1>0){ //No consider source arc (second level balance)
+								if (hasArc[v][i][j1][t] == 1){
+									if(j1 == N){ //If j1 is the sink node, add to expr
+										expr_2ndLevel += x[v][i][j1][t];
+										expr_2ndFlow += fX[v][i][j1][t];
+									}else if (t + inst.travelTime[v][i-1][j1-1] <= tF_add){ //If j1 is a port, it is necessary that the arrival is in the model
+										expr_2ndLevel += x[v][i][j1][t];
+										expr_2ndFlow += fX[v][i][j1][t];
+									}
+								}
+							}
+						}
+						IloExpr expr_link;
+						#ifndef WaitAfterOperate 
+						if (t < tF_add && hasEnteringArc1st[v][i][t-1]==0){ //Not last time period nor entering arc in the previous time period
+							expr_1stLevel += - w[v][i][t] - oA[v][i][t];
+							expr_2ndLevel += -oA[v][i][t] + oB[v][i][t];
+							expr_1stFlow+= -fW[v][i][t] - fOA[v][i][t];
+							expr_link = oA[v][i][t] - z[v][i][t];
+							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t];
+						}else if (t==tF_add){ //Last time period
+							if (hasEnteringArc1st[v][i][t-1]==1){
+								expr_1stLevel += w[v][i][t-1] - oA[v][i][t];
+								expr_2ndLevel += -oA[v][i][t] -oB[v][i][t-1];
+								expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];   
+								expr_1stFlow += fW[v][i][t-1] - fOA[v][i][t];
+								expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t];
+							}else{
+								expr_1stLevel += - oA[v][i][t];
+								expr_2ndLevel += -oA[v][i][t];
+								expr_link = oA[v][i][t] - z[v][i][t];   
+								expr_1stFlow += - fOA[v][i][t];
+								expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t];
+							}
+						}else{ //t<tF and hasEnteringArc1st = 1
+							expr_1stLevel += w[v][i][t-1] - w[v][i][t] - oA[v][i][t];
+							expr_2ndLevel += - oA[v][i][t] - oB[v][i][t-1] + oB[v][i][t];
+							expr_link = oA[v][i][t] + oB[v][i][t-1] - z[v][i][t];
+							expr_1stFlow += fW[v][i][t-1] - fW[v][i][t] - fOA[v][i][t];
+							expr_2ndFlow += -fOA[v][i][t] - fOB[v][i][t-1] - inst.delta[i-1]*f[v][i][t] + fOB[v][i][t];	
+						}
+						#endif
+						#ifdef WaitAfterOperate
+						if (t < tF_add && hasEnteringArc1st[v][i][t-1]==0){ //Not last time period nor entering arc in the previous time period
+							expr_1stLevel += - w[v][i][t] - z[v][i][t];
+							expr_2ndLevel += -z[v][i][t] + wB[v][i][t];	
+							expr_1stFlow+= -fW[v][i][t] - fOA[v][i][t];	
+							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fWB[v][i][t];
+						}else if (t==tF_add){ //Last time period
+							if (hasEnteringArc1st[v][i][t-1]==1){
+								expr_1stLevel += w[v][i][t-1] - z[v][i][t] + wB[v][i][t-1];                                
+								expr_1stFlow += fW[v][i][t-1] - fOA[v][i][t] + fWB[v][i][t-1];                                
+							}else{
+								expr_1stLevel += - z[v][i][t];                                
+								expr_1stFlow += - fOA[v][i][t];                                
+							}
+							expr_2ndLevel += -z[v][i][t];
+							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t];
+						}else{ //t<tF and hasEnteringArc1st = 1
+							expr_1stLevel += w[v][i][t-1] - w[v][i][t] - z[v][i][t] + wB[v][i][t-1];
+							expr_2ndLevel += - z[v][i][t] + wB[v][i][t];	
+							expr_1stFlow += fW[v][i][t-1] - fW[v][i][t] - fOA[v][i][t] + fWB[v][i][t-1];
+							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fWB[v][i][t];
+						}
+						#endif
+						
+						firstLevelBalance[v][i][t].setExpr(expr_1stLevel);
+						secondLevelBalance[v][i][t].setExpr(expr_2ndLevel);
+						#ifndef WaitAfterOperate
+						linkBalance[v][i][t].setExpr(expr_link);
+						#endif
+						firstLevelFlow[v][i][t].setExpr(expr_1stFlow);
+						secondLevelFlow[v][i][t].setExpr(expr_2ndFlow);
+						
+						firstLevelBalance[v][i][t].setName(ss.str().c_str());
+						model.add(firstLevelBalance[v][i][t]);
+						
+						secondLevelBalance[v][i][t].setName(ss1.str().c_str());
+						model.add(secondLevelBalance[v][i][t]);
+						
+						#ifndef WaitAfterOperate
+						linkBalance[v][i][t].setName(ss2.str().c_str());
+						model.add(linkBalance[v][i][t]);
+						#endif
+						
+						firstLevelFlow[v][i][t].setName(ss3.str().c_str());
+						model.add(firstLevelFlow[v][i][t]);
+						
+						secondLevelFlow[v][i][t].setName(ss4.str().c_str());
+						model.add(secondLevelFlow[v][i][t]);
+
+						ss5 << "fjmin_(" << i << "," << t << ")," << v;
+						ss6 << "fjmax_(" << i << "," << t << ")," << v;
+						IloNum minfMax = min(inst.f_max_jt[i-1][t-1], inst.q_v[v]);
+						operationLowerLimit[v][i][t] = IloRange(env, 0, f[v][i][t] - inst.f_min_jt[i-1][t-1]*z[v][i][t] , IloInfinity, ss5.str().c_str());
+						model.add(operationLowerLimit[v][i][t]);
+						
+						operationUpperLimit[v][i][t] = IloRange(env, -IloInfinity, f[v][i][t] - minfMax*z[v][i][t],	0, ss6.str().c_str());
+						model.add(operationUpperLimit[v][i][t]);
+						
+						ss7 << "flowLimitOA_"<<v<<","<<i<<","<<t;
+						#ifndef WaitAfterOperate
+						flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*oA[v][i][t], 0, ss7.str().c_str());
+						#endif
+						#ifdef WaitAfterOperate
+						flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*z[v][i][t], 0, ss7.str().c_str());
+						#endif
+						model.add(flowCapacityOA[v][i][t]);
+						
+						if(t<tF_add){ //Constraints with no last time index
+							#ifndef WaitAfterOperate
+							ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
+							flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-inst.q_v[v]*oB[v][i][t], 0, ss8.str().c_str());
+							model.add(flowCapacityOB[v][i][t]);                            
+							#endif
+							ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
+							flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());							
+							model.add(flowCapacityW[v][i][t]);
+							#ifdef WaitAfterOperate
+							ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
+							flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
+							model.add(flowCapacityWB[v][i][t]);
+							#endif
+						}
+					}
+				}				
+				if(v==0)
+					cumSlack[i].setExpr(expr_cumSlack);
+			}
+		}
+		if(tS_add <= T)
+			sinkNodeBalance[v].setExpr(expr_sinkFlow);
+	}
+	//New objective
+	if(tS_add <= T)
+		obj.setExpr(expr_obj_current + expr_obj_cost - expr_obj_revenue);		
+	///ending removing endblock
+	
 	
 	
 
@@ -1968,30 +2464,34 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			t3S = ceil(T/nIntervals * (v-1) * (1-overLap/100))+1;
 			t3F = min(ceil(T/nIntervals * v * (1-overLap/100)),(double)T);
 
-			//~ model.modifyModel(env, inst, nIntervals, t3S, t3F, t2S, t2F, t1S, t1F);
+			
 					
-			if (t3S < T){
-                cout << "Fixing interval [" << t3S << "," << t3F << "]\n";
-                model.fixSolution(env, inst, t3S, t3F, 0);
-                cout << "Fixed! \n";
-            }
+			//~ if (t3S < T){
+                //~ cout << "Fixing interval [" << t3S << "," << t3F << "]\n";
+                //~ model.fixSolution(env, inst, t3S, t3F, 0);
+                //~ cout << "Fixed! \n";
+            //~ }
 			
 			t2S = ceil(s+p*(v-1))+1;
 			t2F = min(ceil(s+p*v), (double)T); 
 			
-			if(t2S <= T){
-				cout << "Adding to the model [" << t2S << "," << t2F << "]\n";
-				model.decreaseEndBlock (env, inst, nIntervals, t2S, t2F);
-			}
+			//~ if(t2S <= T){				
+				//~ cout << "Adding to the model [" << t2S << "," << t2F << "]\n";				
+				//~ model.decreaseEndBlock (env, inst, nIntervals, t2S, t2F);
+			//~ }
 			
 			t1S = ceil(sizeInterval+p*(v-1)+1);
 			t1F = min(ceil(sizeInterval+p*v),(double)T); 
 			
-			if (t1S <= T){
-				cout << "Integralizing: [" << t1S << "," << t1F << "]\n";
-				model.reIntegralize(env, inst, t1S, t1F);                
-            }
-            model.cplex.exportModel("mip_R&F.lp");
+			
+			model.modifyModel(env, inst, nIntervals, t3S, t3F, t2S, t2F, t1S, t1F);
+			//~ if (t1S <= T){
+				//~ cout << "Integralizing: [" << t1S << "," << t1F << "]\n";
+				//~ model.reIntegralize(env, inst, t1S, t1F);                
+            //~ }
+            
+            
+            //~ model.cplex.exportModel("mip_R&F.lp");
             
             double newGap = max(0.001, (gapFirst - (gapFirst/ceil(T-sizeInterval/p))*v) / 100);
             cout << "New GAP " << newGap*100 << " %" << endl;
