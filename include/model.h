@@ -144,14 +144,8 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloRangeArray> branchingOA;	//Branching rule where sOA = sum{j\inJ}{t\inT} oA[v][i][t]
 		IloRangeArray y_Sum; 					//For branching (total number visits in port j during all planing horizon)
 		IloArray<IloRangeArray> minVisits;		//Valid inequality - minimum number of operations that must be done in each port from t=0 until time t' 
-		IloArray<IloArray<IloRangeArray> > operateAndGo;	//Ensure that a vessel must exit a region after operate when the vessel capacity is lesser than the maximum operation at port
-		
-		IloArray<IloArray<IloRangeArray> > operateAndGo1;	//Ensure that a vessel must exit a region after operate and if it is empty (or full) - Part 1
-		IloArray<IloArray<IloRangeArray> > operateAndGo2;	//Ensure that a vessel must exit a region after operate and if it is empty (or full) - Part 2
-		IloArray<IloRangeArray> sideOpG1;					//Side constraint 1 for the constraint above;
-		IloArray<IloRangeArray> sideOpG2;					//Side constraint 2 for the constraint above;
-		IloArray<IloArray<IloArray<IloIfThen> > >sideIf;				//Side constraint created for repleace sideOpG1 and sideOpG2
-		
+		IloArray<IloArray<IloRangeArray> > operateAndDepart;	//Ensure that a vessel must exit a region after operate when the vessel capacity is lesser than the maximum operation at port
+
 		IloArray<IloArray<IloRangeArray> > noRevisit;	//Impose that a node cannot be visited by a vessel if it arrived in a specified time 
 		
 		IloArray<IloRangeArray> twoPortsNoRevisit; //Impose (partially) to a vessel make only one visit to a port when travelling to a region, and no revisit

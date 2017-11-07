@@ -111,6 +111,7 @@ IloNumArray costKm;			// Cost per km of vessel v
 IloNumArray trav_empt;		// Discont factor for traveling empty
 double maxCapacity;			// Maximum capacity between vessel classes;
 IloNumArray max_travelTime;	// Maximum travel time between ports of one vessel
+int maxTravelTimeInstance;	//Maximum travel time of an instance
 //Identifiers
 IntMatrix identifyVessel;
 IloIntArray idRegion; //Storage the region id of each vessel j
