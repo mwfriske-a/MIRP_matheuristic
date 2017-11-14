@@ -95,7 +95,13 @@ NumNumMatrix lb_oper_jt;	// Lower bound on the number of operating periods neede
 NumNumMatrix delta_it;		// Vector of diference of lb_oper_jt and lb_oper_j,t-1
 IloIntArray p_delta_j;		//Storage for each i \in J the index of delta_it in which delta_it = 1 (we will use the size of p_delta_j)
 
-
+//Arcs
+IloArray< std::vector<std::string> >arcs;				// For each vessel, a vector keys that pointing for register in a hash table
+IloArray <IloArray<IntMatrix> >inArcs;					// For each vessel and each node n=(j,t), subset of entering arcs in the node (index of arcs)
+IloArray <IloArray<IntMatrix> >inRegionArcs;			// For each vessel and each node n=(j,t), subset of entering arcs in the node which depart from another region(index of arcs)
+IloArray <IloArray<IntMatrix> >outArcs;					// For each vessel and each node n=(j,t), subset of exiting arcs in the node  (index of arcs)
+IloArray <IloArray<IntMatrix> >outRegionArcs;			// For each vessel and each node n=(j,t), subset of exiting arcs in the node which arrive in another region (index of arcs)
+IloArray<std::unordered_map<std::string,double> > c_va; //Cost for vessel v travesse an arc a
 
 //Additional information
 IloNumArray f_min_r; //Min f_min_jt per region R (assuming that f_min_r is fixed for all t \in T)
@@ -121,13 +127,6 @@ IloArray<IntMatrix> travelTime;	//Travel time between  port i and j for vessel v
 //Additional data
 IloArray<IloIntArray> maxTimeIntraReg; 		//Maximum travel time between port j and any other port of same region for vessel v
 
-//Arcs
-IloArray< std::vector<std::string> >arcs;				// For each vessel, a vector keys that pointing for register in a hash table
-IloArray <IloArray<IntMatrix> >inArcs;					// For each vessel and each node n=(j,t), subset of entering arcs in the node (index of arcs)
-IloArray <IloArray<IntMatrix> >inRegionArcs;			// For each vessel and each node n=(j,t), subset of entering arcs in the node which depart from another region(index of arcs)
-IloArray <IloArray<IntMatrix> >outArcs;					// For each vessel and each node n=(j,t), subset of exiting arcs in the node  (index of arcs)
-IloArray <IloArray<IntMatrix> >outRegionArcs;			// For each vessel and each node n=(j,t), subset of exiting arcs in the node which arrive in another region (index of arcs)
-IloArray<std::unordered_map<std::string,double> > c_va; //Cost for vessel v travesse an arc a
 
 Instance(IloEnv& env){};
 void readInstance(IloEnv& env, const std::string& name);

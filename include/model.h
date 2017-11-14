@@ -10,7 +10,8 @@ namespace mirp{
 	typedef IloArray<IloNumVarArray> NumVarMatrix;
 	typedef IloArray<IloIntVarArray> IntVarMatrix;
 	typedef IloArray<IloNumArray> NumNumMatrix;
-	typedef IloArray<IloIntArray> IntMatrix;	
+	typedef IloArray<IloIntArray> IntMatrix;
+	typedef IloArray<IloBoolVarArray> BoolMatrix; 
 	
 	void milp(std::string file, const double& timeLimit, std::string optStr);
 	
@@ -146,10 +147,20 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloRangeArray> minVisits;		//Valid inequality - minimum number of operations that must be done in each port from t=0 until time t' 
 		IloArray<IloArray<IloRangeArray> > operateAndDepart;	//Ensure that a vessel must exit a region after operate when the vessel capacity is lesser than the maximum operation at port
 
-		IloArray<IloArray<IloRangeArray> > noRevisit;	//Impose that a node cannot be visited by a vessel if it arrived in a specified time 
+		//Wagner-whitin e Lot-sizing with constant capacity - variables and constraints
+		NumVarMatrix Ms_it;
+		NumVarMatrix Mq_it;
+		BoolMatrix Mo_it;
 		
-		IloArray<IloRangeArray> twoPortsNoRevisit; //Impose (partially) to a vessel make only one visit to a port when travelling to a region, and no revisit
+		IloArray<IloRangeArray> net_sP;
+		IloArray<IloRangeArray> sum_f;
+		IloArray<IloRangeArray> sum_o;
+		IloArray<IloRangeArray> lscc_inv_balance;
+		IloArray<IloRangeArray> lscc_lb_operate;
+		IloArray<IloRangeArray> lscc_ub_operate;
+		IloArray<IloRangeArray> wwcc_relaxation;
 		
+		//
 		
 		//Others
 		std::vector<std::pair<int,int> > ordV;

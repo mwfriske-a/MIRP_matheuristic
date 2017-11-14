@@ -13,8 +13,9 @@
 //~ #define NBerthLimit
 #define NBranching
 #define NBetas
-#define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
+//~ #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
 //~ #define NKnapsackInequalities
+#define NWWCCReformulation
 #define NSimplifyModel					//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 #define NFixSinkArc
 #define NOperateAndDepart
@@ -102,6 +103,20 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
     IloExpr expr_opd(env);
     #endif
     
+    #ifndef NWWCCReformulation
+    Ms_it = NumVarMatrix(env, N-1);
+	Mq_it = NumVarMatrix(env, N-1) ;
+	Mo_it = BoolMatrix(env, N-1) ;
+	
+	net_sP = IloArray<IloRangeArray>(env, N-1) ;
+	sum_f = IloArray<IloRangeArray>(env, N-1) ;
+	sum_o = IloArray<IloRangeArray>(env,N-1) ;
+	lscc_inv_balance = IloArray<IloRangeArray> (env,N-1);
+	lscc_lb_operate = IloArray<IloRangeArray> (env, N-1) ;
+	lscc_ub_operate = IloArray<IloRangeArray>(env, N-1);
+	wwcc_relaxation = IloArray<IloRangeArray>(env, N-1) ;
+    #endif
+    
     //Additional variables for branching
 	#ifndef NBranching
 	#endif
@@ -156,7 +171,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 			arcCost[v][j] = IloArray<IloNumArray>(env,N);
 			fX[v][j] = IloArray<IloNumVarArray>(env, N);
             
-            for(i=0;i<N;i++){ //TODO Optimize: use i=j+1 (there are consequences on build arcs)
+            for(i=0;i<N;i++){ 
 				x[v][j][i] = IloBoolVarArray(env,T);
                 convertX[v][j][i] = IloArray<IloConversion>(env,T);
                 xValue[v][j][i] = IloNumArray(env, T);
@@ -287,18 +302,42 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				}
 			}
 		}
-	}	
+	}
+    //Port time (i,t)
 	for(i=1;i<N-1;i++){
 		alpha[i] = IloNumVarArray(env,T);
 		sP[i] = IloNumVarArray(env, T);	
         #ifndef NBetas
         beta[i] = IloNumVarArray(env,T);
         #endif
+        #ifndef NWWCCReformulation
+        if(inst.typePort[i-1] == 1){
+            Ms_it[i] = IloNumVarArray(env, T);
+            Mq_it[i] = IloNumVarArray(env, T);
+            Mo_it[i] = IloBoolVarArray(env, T);
+            
+            net_sP[i] = IloRangeArray(env, T);
+            sum_f[i] = IloRangeArray(env, T);
+            sum_o[i] = IloRangeArray(env, T);
+            lscc_inv_balance[i] = IloRangeArray(env, T);
+            lscc_lb_operate[i] = IloRangeArray(env, T);
+            lscc_ub_operate[i] = IloRangeArray(env, T);
+            int num_combinations = (T-1)*(T-1) - ceil((T-1)/2) + 2; //Number of combinations for k <= j, k,j \in T
+            wwcc_relaxation[i] = IloRangeArray(env, num_combinations);
+        }
+        #endif        
 		for(t=0;t<T;t++){
 			stringstream ss;
 			if (t == 0){
 				ss << "sP_(" << i << ",0)";
 				sP[i][t] = IloNumVar(env,inst.s_j0[i-1], inst.s_j0[i-1], ss.str().c_str()); //Initial inventory
+                #ifndef NWWCCReformulation
+                if (inst.typePort[i-1] == 1){
+                    ss.str(string());
+                    ss << "MsP_(" << i << "," << t << ")";
+                    Ms_it[i][t] = IloNumVar(env,inst.s_j0[i-1], inst.s_j0[i-1], ss.str().c_str()); //Initial inventory
+                }
+                #endif
 			}else{
 				ss.str(string());
 				ss << "sP_(" << i << "," << t << ")";
@@ -310,6 +349,19 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                 ss.str(string());
 				ss << "beta_(" << i << "," << t << ")";
 				beta[i][t] = IloNumVar(env, 0, inst.d_jt[i-1][t-1], ss.str().c_str());
+                #endif
+                #ifndef NWWCCReformulation
+                if (inst.typePort[i-1] == 1){
+                    ss.str(string());
+                    ss << "MsP_(" << i << "," << t << ")";
+                    Ms_it[i][t] = IloNumVar(env,inst.sMin_jt[i-1][t-1], inst.sMax_jt[i-1][t-1], ss.str().c_str());
+                    ss.str(string());
+                    ss << "Mq_(" << i << "," << t << ")";
+                    Mq_it[i][t] = IloNumVar(env, ss.str().c_str());
+                    ss.str(string());
+                    ss << "Mo_(" << i << "," << t << ")";
+                    Mo_it[i][t] = IloBoolVar(env, ss.str().c_str());
+                }
                 #endif
 			}
 		}
@@ -479,6 +531,12 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	#ifdef WaitAfterOperate
 	flowCapacityWB = IloArray<IloArray<IloRangeArray> >(env,V);
 	#endif
+    
+    //WWCC reformulation
+    #ifndef NWWCCReformulation
+    IloExpr expr_sumF(env);
+    IloExpr expr_sumO(env);
+    #endif
 	
 	#ifndef NKnapsackInequalities
 	knapsack_P_1 = IloArray<IloRangeArray> (env, J+1);			//Altough created for all J ports, it is only considered for loading(production) or consumption(discharging) ports. We create J+1 as index j starts with 1
@@ -494,7 +552,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		stringstream ss1;
 		berthLimit[i] = IloRangeArray(env,T);
 		expr_cumSlack.clear();
-		portInventory[i] = IloRangeArray(env,T);				
+		portInventory[i] = IloRangeArray(env,T);
 		#ifndef NKnapsackInequalities
 		if (inst.typePort[i-1] == 0){ 	//Loading port
 			knapsack_P_1[i] = IloRangeArray(env, num_combinations);		//(T-3)*2 = Number of combinations 1,...t + t,...,T for all t \in T. Using T-3 because de increment of T = inst.t+1
@@ -625,11 +683,21 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 			expr_invBalancePort.clear();
 			stringstream ss, ss2;
 			ss << "berthLimit_(" << i << "," << t << ")";
-			bool emptyExpr = true;			
-			for(v=0;v<V;v++){				
+			bool emptyExpr = true;
+            #ifndef NWWCCReformulation
+            expr_sumF.clear();
+            expr_sumO.clear();
+            #endif
+			for(v=0;v<V;v++){
 				if (hasEnteringArc1st[v][i][t]==1){ //Only if exists an entering arc in the node				
 					expr_berth += z[v][i][t];
 					emptyExpr = false;
+                    #ifndef NWWCCReformulation
+                    if(inst.typePort[i-1] == 1){
+                        expr_sumF += f[v][i][t];
+                        expr_sumO += z[v][i][t];
+                    }
+                    #endif
 				}
 				expr_invBalancePort += -f[v][i][t];
 			}
@@ -649,6 +717,43 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
 				inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
 			model.add(portInventory[i][t]);
+            #ifndef NWWCCReformulation
+            if(inst.typePort[i-1] == 1){     //Only discharging ports                
+                stringstream ss3;
+                ss3 << "NetInventoryPort_(" << i << "," << t << ")";
+                net_sP[i][t] = IloRange(env, -inst.sMinM_jt[i-1][t], Ms_it[i][t] - sP[i][t], -inst.sMinM_jt[i-1][t], ss3.str().c_str());                
+                model.add(net_sP[i][t]);
+                
+                ss3.str(string());
+                ss3 << "sumF_(" << i << "," << t << ")";
+                sum_f[i][t] = IloRange(env, 0, Mq_it[i][t] - expr_sumF, 0, ss3.str().c_str());
+                model.add(sum_f[i][t]);
+                
+                ss3.str(string());
+                ss3 << "sumZ_(" << i << "," << t << ")";
+                sum_o[i][t] = IloRange(env, 0, Mo_it[i][t] - expr_sumO, 0, ss3.str().c_str());
+                model.add(sum_o[i][t]);
+                
+                ss3.str(string());
+                ss3 << "MinvBalancePort_(" << i << "," << t << ")";
+                lscc_inv_balance[i][t] = IloRange(env, -inst.dM_jt[i-1][t], Ms_it[i][t] - Ms_it[i][t-1] - Mq_it[i][t], -inst.dM_jt[i-1][t], ss3.str().c_str());
+                model.add(lscc_inv_balance[i][t]);
+                
+                ss3.str(string());
+                ss3 << "lb_discharge(" << i << "," << t << ")";
+                lscc_lb_operate[i][t] = IloRange(env, 0, Mq_it[i][t] - inst.f_min_jt[i-1][0]*Mo_it[i][t], IloInfinity, ss3.str().c_str());
+                model.add(lscc_lb_operate[i][t]);
+                
+                ss3.str(string());
+                ss3 << "ub_discharge(" << i << "," << t << ")";
+                lscc_ub_operate[i][t] = IloRange(env, -IloInfinity, Mq_it[i][t] - inst.f_max_jt[i-1][0]*Mo_it[i][t], 0, ss3.str().c_str());
+                model.add(lscc_ub_operate[i][t]);
+                
+                //~ for(int t1=t;t1<=tOEB;t1++){
+                
+                //~ }
+            }
+            #endif
 		}
 		ss1 << "cum_slack("<<i<<")";
 		cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
@@ -2531,7 +2636,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		Model model(env);
 		model.buildFixAndRelaxModel(env,inst, nIntervals, endBlock);
 		model.setParameters(env, timePerIterFirst, gapFirst);
-		
+        model.cplex.exportModel("mip_R&F.lp");	
 		//Relax-and-fix
 		double p = T/nIntervals*(1-overLap/100); // Units of t that are add at each iteration to the model.
 		int s = T-(T/nIntervals*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.

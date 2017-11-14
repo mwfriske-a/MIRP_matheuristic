@@ -188,7 +188,7 @@ void Instance::readInstance(IloEnv& env, const string& name){
 	for(i=0;i<numTotalPorts;i++){
 		alp_max_jt[i] = IloNumArray(env, t);
 		d_jt[i] = IloNumArray(env, t);
-		dM_jt[i] = IloNumArray(env, t);
+		dM_jt[i] = IloNumArray(env, t+1); //CAUTION: index 0 is desconsidered
 		f_min_jt[i] = IloNumArray(env, t);
 		f_max_jt[i]  = IloNumArray(env, t);
 		p_jt[i]  = IloNumArray(env, t);
@@ -197,9 +197,9 @@ void Instance::readInstance(IloEnv& env, const string& name){
 		}
 		r_jt[i] = IloNumArray(env, t);
 		sMin_jt[i] = IloNumArray(env, t);
-		sMinM_jt[i] = IloNumArray(env, t);
+		sMinM_jt[i] = IloNumArray(env, t+1); //CAUTION: Considering 0 as the initial inventory.
 		sMax_jt[i]  = IloNumArray(env, t);
-		sMaxM_jt[i]  = IloNumArray(env, t);
+		sMaxM_jt[i]  = IloNumArray(env, t+1); //CAUTION: Considering 0 as the initial inventory.
 		if (i<sumLoadPorts)
 			delta[i] = 1;
 		else
@@ -217,7 +217,7 @@ void Instance::readInstance(IloEnv& env, const string& name){
       exit(1);
 	}
 	string s2,line1;
-	//For each port
+	//For each loading port
 	for(j=0;j<IloSum(loadPorts);j++){
 		getline(lPorts,s);
 		stringstream(s) >> s1 >> s2; 
@@ -271,23 +271,25 @@ void Instance::readInstance(IloEnv& env, const string& name){
 		ss >> s1;
 			
 		//Storaging in the port-time pairs
-		for (i=0;i<t;i++){
-			f_min_jt[idPort][i] = minApp;
-			f_max_jt[idPort][i] = maxApp;		
-			sMin_jt[idPort][i] = 0;
-			sMax_jt[idPort][i] = capacity;		
-			ss >> d_jt[idPort][i];
-			if(i==0){								
-				sMaxM_jt[idPort][i] = min(sMax_jt[idPort][i],  s_j0[idPort]+d_jt[idPort][i]);
-				dM_jt[idPort][i]  = d_jt[idPort][i] + s_j0[idPort] - sMaxM_jt[idPort][i];		//s_j0[idPort] is equivalent to sMaxM[0]
+		for (i=0;i<=t;i++){
+			if(i<t){
+				f_min_jt[idPort][i] = minApp;
+				f_max_jt[idPort][i] = maxApp;		
+				sMin_jt[idPort][i] = 0;
+				sMax_jt[idPort][i] = capacity;		
+				ss >> d_jt[idPort][i];
+				alp_max_jt[idPort][i] = round(constantForSinglePeriodAlphaSlack*d_jt[idPort][i]);
+				//~ r_jt[idPort][i] = 0;
+				//~ cout << i << " " << d_jt[idPort][i] << endl;
+				//~ cout << "Alpha j t " << alp_max_jt[idPort][i] << endl;
+			}
+			if(i==0){
+				sMaxM_jt[idPort][i] = s_j0[idPort];
 			}else{
-				sMaxM_jt[idPort][i] = min(sMax_jt[idPort][i],  sMaxM_jt[idPort][i-1]+d_jt[idPort][i]);														
-				dM_jt[idPort][i]  = d_jt[idPort][i] + sMaxM_jt[idPort][i-1] - sMaxM_jt[idPort][i];				
-			}			
-			alp_max_jt[idPort][i] = round(constantForSinglePeriodAlphaSlack*d_jt[idPort][i]);
-			//~ r_jt[idPort][i] = 0;
-			//~ cout << i << " " << d_jt[idPort][i] << endl;
-			//~ cout << "Alpha j t " << alp_max_jt[idPort][i] << endl;
+				sMaxM_jt[idPort][i] = min(sMax_jt[idPort][i-1],  sMaxM_jt[idPort][i-1]+d_jt[idPort][i-1]);
+				dM_jt[idPort][i]  = d_jt[idPort][i-1] + sMaxM_jt[idPort][i-1] - sMaxM_jt[idPort][i];
+			}
+			
 		}
 		
 		alp_max_j[idPort] = constantForCumulativeAlphaSlack * d_jt[idPort][0];
@@ -303,7 +305,7 @@ void Instance::readInstance(IloEnv& env, const string& name){
       cerr << "Unable to open discharging ports data"<< endl;
       exit(1);
 	}
-	//For each port
+	//For each discharging port
 	for(j=0;j<IloSum(discPorts);j++){
 		getline(dPorts,s);
 		stringstream(s) >> s1 >> s2; 
@@ -355,25 +357,26 @@ void Instance::readInstance(IloEnv& env, const string& name){
 		ss1 >> s1;
 			
 		//Storaging in the port-time pairs
-		for (i=0;i<t;i++){
-			f_min_jt[idPort][i] = minApp;
-			f_max_jt[idPort][i] = maxApp;		
-			sMin_jt[idPort][i] = 0;			
-			sMax_jt[idPort][i] = capacity;		
-			ss >> d_jt[idPort][i];
-			if(i==0){								
-				sMinM_jt[idPort][i] = max(sMin_jt[idPort][i],  s_j0[idPort]-d_jt[idPort][i]);
-				dM_jt[idPort][i]  = d_jt[idPort][i] - s_j0[idPort] + sMinM_jt[idPort][i];		//s_j0[idPort] is equivalent to sMinM[0]
-			}else{
-				sMinM_jt[idPort][i] = max(sMin_jt[idPort][i],  sMinM_jt[idPort][i-1]-d_jt[idPort][i]);														
-				dM_jt[idPort][i]  = d_jt[idPort][i] - sMinM_jt[idPort][i-1] + sMinM_jt[idPort][i];				
+		for (i=0;i<=t;i++){
+			if (i<t){
+				f_min_jt[idPort][i] = minApp;
+				f_max_jt[idPort][i] = maxApp;		
+				sMin_jt[idPort][i] = 0;			
+				sMax_jt[idPort][i] = capacity;		
+				ss >> d_jt[idPort][i];
+
+				ss1 >> r_jt[idPort][i];
+				alp_max_jt[idPort][i] = round(constantForSinglePeriodAlphaSlack*d_jt[idPort][i]);	
+				//~ cout << round(constantForSinglePeriodAlphaSlack*d_jt[idPort][i]) << endl;
+				//~ cout << "Alpha j t " << alp_max_jt[idPort][i] << endl;
 			}
-			//~ cout << "D^M" << idPort << "," << i << " = " << dM_jt[idPort][i] << "\t\t" <<  "SM " << idPort << ","<< i << " " << sMinM_jt[idPort][i] << endl;
-			
-			ss1 >> r_jt[idPort][i];
-			alp_max_jt[idPort][i] = round(constantForSinglePeriodAlphaSlack*d_jt[idPort][i]);	
-			//~ cout << round(constantForSinglePeriodAlphaSlack*d_jt[idPort][i]) << endl;
-			//~ cout << "Alpha j t " << alp_max_jt[idPort][i] << endl;
+			if(i==0){
+				sMinM_jt[idPort][i] = s_j0[idPort];	
+			}else{
+				sMinM_jt[idPort][i] = max(sMin_jt[idPort][i-1],  sMinM_jt[idPort][i-1]-d_jt[idPort][i-1]);
+				dM_jt[idPort][i]  = d_jt[idPort][i-1] - sMinM_jt[idPort][i-1] + sMinM_jt[idPort][i];
+			}
+			//~ cout << "sMinM_jt " << idPort << " - " << i << " " << sMinM_jt[idPort][i] << "/ dMjt " << dM_jt[idPort][i] << endl;
 		}
 		alp_max_j[idPort] = constantForCumulativeAlphaSlack * d_jt[idPort][0];
 		//~ cout << "Alpha J " << alp_max_j[idPort] << endl;
@@ -581,6 +584,7 @@ void Instance::readInstance(IloEnv& env, const string& name){
 	///Travel times for each vessel class	
 	travelTime = IloArray<IntMatrix>(env,totalVessels);
 	max_travelTime = IloNumArray(env,totalVessels);
+	maxTravelTimeInstance = 0;
 	for(i=0;i<totalVessels;i++){
 		travelTime[i] = IntMatrix(env,numTotalPorts);
 		for(j=0;j<numTotalPorts;j++) travelTime[i][j] = IloIntArray(env, numTotalPorts);
@@ -615,8 +619,12 @@ void Instance::readInstance(IloEnv& env, const string& name){
 				}
 			}				
 		}
-		for (int k=0;k<v[i];k++)
+		for (int k=0;k<v[i];k++){
 			max_travelTime[identifyVessel[i][k]] = maxTT;
+			if(maxTT > maxTravelTimeInstance)
+				maxTravelTimeInstance = maxTT;
+		}
+			
 	}
 	//~ for (i=0;i<totalVessels;i++){
 		//~ cout << "Vessel " << i << endl;
