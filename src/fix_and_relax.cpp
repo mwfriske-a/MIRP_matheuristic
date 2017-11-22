@@ -13,10 +13,10 @@
 //~ #define NBerthLimit
 #define NBranching
 #define NBetas
-//~ #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
+//~ #define WaitAfterOperate		//If defined, allows a vessel to wait after operates at a port.
 //~ #define NKnapsackInequalities
-#define NWWCCReformulation
-#define NSimplifyModel					//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
+//~ #define NWWCCReformulation          //TODO somente implementado para -e=0
+#define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 #define NFixSinkArc
 #define NOperateAndDepart
 
@@ -103,18 +103,11 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
     IloExpr expr_opd(env);
     #endif
     
-    #ifndef NWWCCReformulation
-    Ms_it = NumVarMatrix(env, N-1);
-	Mq_it = NumVarMatrix(env, N-1) ;
-	Mo_it = BoolMatrix(env, N-1) ;
-	
-	net_sP = IloArray<IloRangeArray>(env, N-1) ;
-	sum_f = IloArray<IloRangeArray>(env, N-1) ;
-	sum_o = IloArray<IloRangeArray>(env,N-1) ;
+    #ifndef NWWCCReformulation	
 	lscc_inv_balance = IloArray<IloRangeArray> (env,N-1);
-	lscc_lb_operate = IloArray<IloRangeArray> (env, N-1) ;
-	lscc_ub_operate = IloArray<IloRangeArray>(env, N-1);
-	wwcc_relaxation = IloArray<IloRangeArray>(env, N-1) ;
+	lscc_lb_operate = IloArray<IloRangeArray> (env, N-1);
+	lscc_ub_operate = IloArray<IloRangeArray>(env, N-1);	
+	wwcc_relaxation = IloArray<IloRangeArray>(env, N-1);
     #endif
     
     //Additional variables for branching
@@ -311,33 +304,21 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
         beta[i] = IloNumVarArray(env,T);
         #endif
         #ifndef NWWCCReformulation
-        if(inst.typePort[i-1] == 1){
-            Ms_it[i] = IloNumVarArray(env, T);
-            Mq_it[i] = IloNumVarArray(env, T);
-            Mo_it[i] = IloBoolVarArray(env, T);
-            
-            net_sP[i] = IloRangeArray(env, T);
-            sum_f[i] = IloRangeArray(env, T);
-            sum_o[i] = IloRangeArray(env, T);
+        //Common for loading and discharging ports        
+        int num_combinations = (t-1)*t/2; //Number of combinations for k <= j, k,j \in T
+        wwcc_relaxation[i] = IloRangeArray(env, num_combinations);
+        //Specific for discharging ports
+        if(inst.typePort[i-1] == 1){ 
             lscc_inv_balance[i] = IloRangeArray(env, T);
             lscc_lb_operate[i] = IloRangeArray(env, T);
             lscc_ub_operate[i] = IloRangeArray(env, T);
-            int num_combinations = (T-1)*(T-1) - ceil((T-1)/2) + 2; //Number of combinations for k <= j, k,j \in T
-            wwcc_relaxation[i] = IloRangeArray(env, num_combinations);
         }
         #endif        
 		for(t=0;t<T;t++){
 			stringstream ss;
 			if (t == 0){
 				ss << "sP_(" << i << ",0)";
-				sP[i][t] = IloNumVar(env,inst.s_j0[i-1], inst.s_j0[i-1], ss.str().c_str()); //Initial inventory
-                #ifndef NWWCCReformulation
-                if (inst.typePort[i-1] == 1){
-                    ss.str(string());
-                    ss << "MsP_(" << i << "," << t << ")";
-                    Ms_it[i][t] = IloNumVar(env,inst.s_j0[i-1], inst.s_j0[i-1], ss.str().c_str()); //Initial inventory
-                }
-                #endif
+				sP[i][t] = IloNumVar(env,inst.s_j0[i-1], inst.s_j0[i-1], ss.str().c_str()); //Initial inventory                
 			}else{
 				ss.str(string());
 				ss << "sP_(" << i << "," << t << ")";
@@ -349,20 +330,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                 ss.str(string());
 				ss << "beta_(" << i << "," << t << ")";
 				beta[i][t] = IloNumVar(env, 0, inst.d_jt[i-1][t-1], ss.str().c_str());
-                #endif
-                #ifndef NWWCCReformulation
-                if (inst.typePort[i-1] == 1){
-                    ss.str(string());
-                    ss << "MsP_(" << i << "," << t << ")";
-                    Ms_it[i][t] = IloNumVar(env,inst.sMin_jt[i-1][t-1], inst.sMax_jt[i-1][t-1], ss.str().c_str());
-                    ss.str(string());
-                    ss << "Mq_(" << i << "," << t << ")";
-                    Mq_it[i][t] = IloNumVar(env, ss.str().c_str());
-                    ss.str(string());
-                    ss << "Mo_(" << i << "," << t << ")";
-                    Mo_it[i][t] = IloBoolVar(env, ss.str().c_str());
-                }
-                #endif
+                #endif                
 			}
 		}
 	}
@@ -536,6 +504,8 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
     #ifndef NWWCCReformulation
     IloExpr expr_sumF(env);
     IloExpr expr_sumO(env);
+    IloExpr expr_wwcc(env);
+    int it_kt;
     #endif
 	
 	#ifndef NKnapsackInequalities
@@ -549,6 +519,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	#endif
 	unsigned int num_combinations = (T-3)*2;
 	for(i=1;i<=J;i++){
+        #ifndef NWWCCReformulation
+        it_kt = 0;
+        #endif
 		stringstream ss1;
 		berthLimit[i] = IloRangeArray(env,T);
 		expr_cumSlack.clear();
@@ -692,11 +665,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				if (hasEnteringArc1st[v][i][t]==1){ //Only if exists an entering arc in the node				
 					expr_berth += z[v][i][t];
 					emptyExpr = false;
-                    #ifndef NWWCCReformulation
-                    if(inst.typePort[i-1] == 1){
-                        expr_sumF += f[v][i][t];
-                        expr_sumO += z[v][i][t];
-                    }
+                    #ifndef NWWCCReformulation                    
+                    expr_sumF += f[v][i][t];
+                    expr_sumO += z[v][i][t];                    
                     #endif
 				}
 				expr_invBalancePort += -f[v][i][t];
@@ -717,48 +688,78 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
 				inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
 			model.add(portInventory[i][t]);
-            #ifndef NWWCCReformulation
-            if(inst.typePort[i-1] == 1){     //Only discharging ports                
-                stringstream ss3;
-                ss3 << "NetInventoryPort_(" << i << "," << t << ")";
-                net_sP[i][t] = IloRange(env, -inst.sMinM_jt[i-1][t], Ms_it[i][t] - sP[i][t], -inst.sMinM_jt[i-1][t], ss3.str().c_str());                
-                model.add(net_sP[i][t]);
-                
+            #ifndef NWWCCReformulation            
+            stringstream ss3;
+            if(inst.typePort[i-1] == 1){ //Discharging ports
                 ss3.str(string());
-                ss3 << "sumF_(" << i << "," << t << ")";
-                sum_f[i][t] = IloRange(env, 0, Mq_it[i][t] - expr_sumF, 0, ss3.str().c_str());
-                model.add(sum_f[i][t]);
-                
-                ss3.str(string());
-                ss3 << "sumZ_(" << i << "," << t << ")";
-                sum_o[i][t] = IloRange(env, 0, Mo_it[i][t] - expr_sumO, 0, ss3.str().c_str());
-                model.add(sum_o[i][t]);
-                
-                ss3.str(string());
-                ss3 << "MinvBalancePort_(" << i << "," << t << ")";
-                lscc_inv_balance[i][t] = IloRange(env, -inst.dM_jt[i-1][t], Ms_it[i][t] - Ms_it[i][t-1] - Mq_it[i][t], -inst.dM_jt[i-1][t], ss3.str().c_str());
-                model.add(lscc_inv_balance[i][t]);
+                ss3 << "LSCC_invBalancePort_(" << i << "," << t << ")";
+                if (t==1){ //Considers the net inventory as 0
+                    lscc_inv_balance[i][t] = IloRange(env, inst.sMinM_jt[i-1][t]-inst.dM_jt[i-1][t], sP[i][t] - expr_sumF, 
+                    inst.sMinM_jt[i-1][t]-inst.dM_jt[i-1][t], ss3.str().c_str());
+                }else{
+                    lscc_inv_balance[i][t] = IloRange(env, inst.sMinM_jt[i-1][t]-inst.sMinM_jt[i-1][t-1]-inst.dM_jt[i-1][t], 
+                    sP[i][t] - sP[i][t-1] - expr_sumF, inst.sMinM_jt[i-1][t]-inst.sMinM_jt[i-1][t-1]-inst.dM_jt[i-1][t], ss3.str().c_str());
+                }
+                //~ model.add(lscc_inv_balance[i][t]);            
                 
                 ss3.str(string());
                 ss3 << "lb_discharge(" << i << "," << t << ")";
-                lscc_lb_operate[i][t] = IloRange(env, 0, Mq_it[i][t] - inst.f_min_jt[i-1][0]*Mo_it[i][t], IloInfinity, ss3.str().c_str());
-                model.add(lscc_lb_operate[i][t]);
+                lscc_lb_operate[i][t] = IloRange(env, 0, expr_sumF - inst.f_min_jt[i-1][0]*expr_sumO, IloInfinity, ss3.str().c_str());
+                //~ model.add(lscc_lb_operate[i][t]);
                 
                 ss3.str(string());
                 ss3 << "ub_discharge(" << i << "," << t << ")";
-                lscc_ub_operate[i][t] = IloRange(env, -IloInfinity, Mq_it[i][t] - inst.f_max_jt[i-1][0]*Mo_it[i][t], 0, ss3.str().c_str());
-                model.add(lscc_ub_operate[i][t]);
-                
-                //~ for(int t1=t;t1<=tOEB;t1++){
-                
-                //~ }
+                lscc_ub_operate[i][t] = IloRange(env, -IloInfinity, expr_sumF - inst.f_max_jt[i-1][0]*expr_sumO, 0, ss3.str().c_str());
+                //~ model.add(lscc_ub_operate[i][t]);
+            }
+            //Common for both loading and discharging ports
+            for(int k=1;k<=t;k++){
+                ss3.str(string());
+                ss3 << it_kt << "_wwcc_relaxation_" << i << "(" << k << "," << t << ")";                    
+                expr_wwcc.clear();
+                int wwcc_rhs=0;
+                bool hasExpr=false;
+                for(int u=k;u<=t;u++){
+                    for (v=0;v<V;v++){
+                        if(hasEnteringArc1st[v][i][u]==1){
+                            expr_wwcc += z[v][i][u];
+                            hasExpr = true;
+                        }
+                    }
+                    if (inst.typePort[i-1] == 1) //Discharging port
+                        wwcc_rhs += inst.dM_jt[i-1][u];
+                    else    //Loading port
+                        wwcc_rhs += inst.d_jt[i-1][u-1];
+                }
+                expr_wwcc *= inst.f_max_jt[i-1][t-1];
+                if(k==1){ //When k=1 and k-1=0, net inventory variable is 0
+                    if(inst.typePort[i-1] == 0){ //Loading port
+                        wwcc_rhs += inst.s_j0[i-1] - inst.sMax_jt[i-1][1];
+                    }
+                }else{ 
+                    if(inst.typePort[i-1] == 1){ //Discharging port
+                        expr_wwcc += sP[i][k-1];
+                        wwcc_rhs += inst.sMinM_jt[i-1][k-1];
+                    }else{  //Loading port
+                        expr_wwcc -= sP[i][k-1];
+                        wwcc_rhs -= inst.sMax_jt[i-1][1]; // == -\overline{S}_i
+                    }                    
+                }                
+                if(hasExpr || k>1){                    
+                    //~ cout << " " <<  expr_wwcc << " >= " << wwcc_rhs << endl;
+                    wwcc_relaxation[i][it_kt] = IloRange(env, wwcc_rhs, expr_wwcc, IloInfinity, ss3.str().c_str());                    
+                    model.add(wwcc_relaxation[i][it_kt]);
+                }
+                //~ cout << ss3.str() << endl;
+                it_kt++;
             }
             #endif
 		}
 		ss1 << "cum_slack("<<i<<")";
 		cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
-		model.add(cumSlack[i]);
+		model.add(cumSlack[i]);        
 	}
+    //~ cout << "it_kt = " << it_kt << endl;
 	expr_cumSlack.end();
 	expr_berth.end();
 	expr_invBalancePort.end();
@@ -1823,15 +1824,15 @@ void Model::getSolValsW(IloEnv& env, Instance inst, const int& tS, const int& tF
 	}
 }
 
-void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const int& tS_fix, const int& tF_fix, const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int){
+void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const int& tS_fix, const int& tF_fix, 
+    const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int){
 	int i,j,t,v,a, t0;
 	int T = inst.t;
 	int timePerInterval = T/nIntervals; //Number of time periods in each interval
 	int J = inst.numTotalPorts;	
 	double intPart;	
 	int V = inst.speed.getSize(); //# of vessels
-    int N = J + 1;    
-	
+    int N = J + 1;    	
 	//First gets the solution values for fixing (when needed)
 	if (tS_fix < T){		
 		cout << "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
@@ -1854,7 +1855,15 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 	IloExpr expr_sinkFlow(env), expr_1stLevel(env), expr_2ndLevel(env), expr_1stFlow(env), expr_2ndFlow(env);
 	#ifndef NOperateAndDepart	
     IloExpr expr_opd(env);
-    #endif	
+    #endif
+    
+    #ifndef NWWCCReformulation
+    IloExpr expr_sumF(env);
+    IloExpr expr_sumO(env);
+    IloExpr expr_wwcc(env);
+    int it_kt;
+    #endif
+    
 	for(v=0;v<V;v++){
 		if(tS_add <= T){
 			expr_sinkFlow.clear();
@@ -2112,6 +2121,9 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 					}
 					#endif		
 				}
+                #ifndef NWWCCReformulation
+                it_kt= (tS_add-1)*tS_add/2;
+                #endif
 			}
 						
 			for(j=1;j<=N;j++){//Considering ports and sink node								 
@@ -2158,6 +2170,11 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 								#ifndef NBetas
 								expr_obj_cost += 1000*beta[i][t];										//Auxiliary variables
 								#endif
+                                
+                                #ifndef NWWCCReformulation
+                                expr_sumF.clear();
+                                expr_sumO.clear();
+                                #endif
 							}
 						}
 					}
@@ -2213,14 +2230,18 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 							if(t>=tS_add){ //New components
 								if(hasEnteringArc1st[v][i][t]==1){
 									expr_obj_revenue += inst.r_jt[i-1][t-1]*f[v][i][t];						//1st term
-									expr_obj_cost += (t-1)*inst.attemptCost*z[v][i][t];						//3rd term				
+									expr_obj_cost += (t-1)*inst.attemptCost*z[v][i][t];						//3rd term
+                                    #ifndef NWWCCReformulation
+                                    expr_sumF += f[v][i][t];
+                                    expr_sumO += z[v][i][t];
+                                    #endif
 								}
 							}
 						}						
 					}					
-					///end vessel port time iterator (v,i,t)					
+					///end vessel port time iterator (v,i,t)
 					stringstream ss, ss1, ss2;
-					ss2 << "flowLimitX_" << v << "," << i << "," << j << "," << t;					
+					ss2 << "flowLimitX_" << v << "," << i << "," << j << "," << t;
 					if (j<=J){				//When j is a port
 						int t2 = t + inst.travelTime[v][i-1][j-1];
 						//For decreaseEndBlock
@@ -2488,8 +2509,76 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 							model.add(flowCapacityWB[v][i][t]);
 							#endif
 						}
+                        ///Another port-time iteraror (i,t)
+                        if(v==0){
+                            #ifndef NWWCCReformulation //TODO - Inventory balance and upper and lower bound are note necessary
+                            stringstream ss12;
+                            if(inst.typePort[i-1] == 1){ //Discharging ports
+                                ss12.str(string());
+                                ss12 << "LSCC_invBalancePort_(" << i << "," << t << ")";
+                                if (t==1){ //Considers the net inventory as 0
+                                    lscc_inv_balance[i][t] = IloRange(env, inst.sMinM_jt[i-1][t]-inst.dM_jt[i-1][t], sP[i][t] - expr_sumF, 
+                                    inst.sMinM_jt[i-1][t]-inst.dM_jt[i-1][t], ss12.str().c_str());
+                                }else{
+                                    lscc_inv_balance[i][t] = IloRange(env, inst.sMinM_jt[i-1][t]-inst.sMinM_jt[i-1][t-1]-inst.dM_jt[i-1][t], 
+                                    sP[i][t] - sP[i][t-1] - expr_sumF, inst.sMinM_jt[i-1][t]-inst.sMinM_jt[i-1][t-1]-inst.dM_jt[i-1][t], ss12.str().c_str());
+                                }
+                                //~ model.add(lscc_inv_balance[i][t]);            
+                                
+                                ss12.str(string());
+                                ss12 << "lb_discharge(" << i << "," << t << ")";                                
+                                lscc_lb_operate[i][t] = IloRange(env, 0, expr_sumF - inst.f_min_jt[i-1][0]*expr_sumO, IloInfinity, ss12.str().c_str());
+                                //~ model.add(lscc_lb_operate[i][t]);
+                                
+                                ss12.str(string());
+                                ss12 << "ub_discharge(" << i << "," << t << ")";
+                                lscc_ub_operate[i][t] = IloRange(env, -IloInfinity, expr_sumF - inst.f_max_jt[i-1][0]*expr_sumO, 0, ss12.str().c_str());
+                                //~ model.add(lscc_ub_operate[i][t]);
+                            }
+                            //Common for both loading and discharging ports
+                            for(int k=1;k<=t;k++){
+                                ss12.str(string());
+                                ss12 << it_kt << "_wwcc_relaxation_" << i << "(" << k << "," << t << ")";                    
+                                expr_wwcc.clear();
+                                int wwcc_rhs=0;
+                                bool hasExpr=false;                                
+                                for(int u=k;u<=t;u++){
+                                    for (int v1=0;v1<V;v1++){
+                                        if(hasEnteringArc1st[v1][i][u]==1){
+                                            expr_wwcc += z[v1][i][u];
+                                            hasExpr = true;
+                                        }
+                                    }
+                                    if (inst.typePort[i-1] == 1) //Discharging port
+                                        wwcc_rhs += inst.dM_jt[i-1][u];
+                                    else    //Loading port
+                                        wwcc_rhs += inst.d_jt[i-1][u-1];
+                                }
+                                expr_wwcc *= inst.f_max_jt[i-1][t-1];                                
+                                if(k==1){ //When k=1 and k-1=0, net inventory variable is 0
+                                    if(inst.typePort[i-1] == 0){ //Loading port
+                                        wwcc_rhs += inst.s_j0[i-1] - inst.sMax_jt[i-1][1];
+                                    }                                    
+                                }else{ 
+                                    if(inst.typePort[i-1] == 1){ //Discharging port
+                                        expr_wwcc += sP[i][k-1];
+                                        wwcc_rhs += inst.sMinM_jt[i-1][k-1];
+                                    }else{  //Loading port
+                                        expr_wwcc -= sP[i][k-1];
+                                        wwcc_rhs -= inst.sMax_jt[i-1][1]; // == -\overline{S}_i
+                                    }                                    
+                                }                
+                                if(hasExpr || k>1){                                    
+                                    //~ cout << " " <<  expr_wwcc << " >= " << wwcc_rhs << endl;
+                                    wwcc_relaxation[i][it_kt] = IloRange(env, wwcc_rhs, expr_wwcc, IloInfinity, ss12.str().c_str());                    
+                                    model.add(wwcc_relaxation[i][it_kt]); 
+                                }
+                                it_kt++;
+                            }
+                            #endif
+                        }
 					}
-				}				
+				}
 				if(v==0)
 					cumSlack[i].setExpr(expr_cumSlack);
 			}
@@ -2499,7 +2588,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 	}
 	//New objective
 	if(tS_add <= T)
-		obj.setExpr(expr_obj_current + expr_obj_cost - expr_obj_revenue);		
+		obj.setExpr(expr_obj_current + expr_obj_cost - expr_obj_revenue);
 	///ending removing endblock
 
 }

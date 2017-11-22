@@ -152,14 +152,15 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		NumVarMatrix Mq_it;
 		BoolMatrix Mo_it;
 		
-		IloArray<IloRangeArray> net_sP;
 		IloArray<IloRangeArray> sum_f;
 		IloArray<IloRangeArray> sum_o;
 		IloArray<IloRangeArray> lscc_inv_balance;
 		IloArray<IloRangeArray> lscc_lb_operate;
 		IloArray<IloRangeArray> lscc_ub_operate;
-		IloArray<IloRangeArray> wwcc_relaxation;
+		IloArray<IloRangeArray> lscc_lb_spareStock;
+		IloArray<IloRangeArray> lscc_ub_spareStock;
 		
+		IloArray<IloRangeArray> wwcc_relaxation;		
 		//
 		
 		//Others
