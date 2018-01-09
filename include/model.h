@@ -4,7 +4,6 @@
 #include <ilcplex/ilocplex.h>
 
 #include "util.h"
-#define WaitAfterOperate
 
 namespace mirp{		
 	typedef IloArray<IloNumVarArray> NumVarMatrix;
@@ -36,6 +35,7 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		 */
 		NumVarMatrix alpha; 								//amount of product purchasses from or sells to spot market in time time period	
 		NumVarMatrix beta;	 								//Slack for amount of product purchasses from or sells to spot market in time time period	
+		NumVarMatrix theta;	 								//Slack for amount of product purchasses from or sells to spot market in time time period	
 		NumVarMatrix sP;									//Number of units of inventory at port j available at the end of time period t
 		IloArray<NumVarMatrix> f;		 					//amount loaded/discharged by a vessel in a port-time node
 		
@@ -112,6 +112,11 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloArray<IloRangeArray> >   flowCapacityOB;
 		IloArray<IloArray<IloRangeArray> >   flowCapacityW;
 		IloArray<IloArray<IloRangeArray> >   flowCapacityWB;
+		IloArray<IloArray<IloArray<IloRangeArray> > >  flowMinCapacityX;
+		IloArray<IloArray<IloRangeArray> >   flowMinCapacityOA;
+		IloArray<IloArray<IloRangeArray> >   flowMinCapacityOB;
+		IloArray<IloArray<IloRangeArray> >   flowMinCapacityW;
+		IloArray<IloArray<IloRangeArray> >   flowMinCapacityWB;
 		
 		///Valid inequalities
 		//For multiples denominators
@@ -132,14 +137,10 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloRangeArray> knapsack_P_1; //Inequalities for the case where T_v = T (for each Q_v, j and it)
 		IloArray<IloRangeArray> knapsack_P_2; //Inequalities for the case where T_v = \emptyset
 		//Dischargin ports
-		IloArray<IloRangeArray> knapsack_D_1; //Case R²_v = T 
-		#ifndef WaitAfterOperate
+		IloArray<IloRangeArray> knapsack_D_1; //Case R²_v = T
 		IloArray<IloRangeArray> knapsack_D_2; //Case R¹_v = T
 		IloArray<IloRangeArray> knapsack_D_3; //Case R⁰_v = T
-		#endif
-		#ifdef WaitAfterOperate
-		IloArray<IloRangeArray>  knapsack_D_2; //Case R¹_v = T
-		#endif
+
 		//Additional constraints;
 		IloArray<IloRangeArray> branchingX;		//Branching rule where sX = sum{j\inJ}{t\inT} x[v][i][j][t]
 		IloArray<IloRangeArray> branchingOA;	//Branching rule where sOA = sum{j\inJ}{t\inT} oA[v][i][t]
@@ -147,21 +148,10 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloRangeArray> minVisits;		//Valid inequality - minimum number of operations that must be done in each port from t=0 until time t' 
 		IloArray<IloArray<IloRangeArray> > operateAndDepart;	//Ensure that a vessel must exit a region after operate when the vessel capacity is lesser than the maximum operation at port
 
-		//Wagner-whitin e Lot-sizing with constant capacity - variables and constraints
-		NumVarMatrix Ms_it;
-		NumVarMatrix Mq_it;
-		BoolMatrix Mo_it;
+		//Wagner-whitin e Lot-sizing with constant capacity (1 level)- variables and constraints
+		IloArray<IloRangeArray> wwcc_relaxation;
 		
-		IloArray<IloRangeArray> sum_f;
-		IloArray<IloRangeArray> sum_o;
-		IloArray<IloRangeArray> lscc_inv_balance;
-		IloArray<IloRangeArray> lscc_lb_operate;
-		IloArray<IloRangeArray> lscc_ub_operate;
-		IloArray<IloRangeArray> lscc_lb_spareStock;
-		IloArray<IloRangeArray> lscc_ub_spareStock;
-		
-		IloArray<IloRangeArray> wwcc_relaxation;		
-		//
+		//Lot-sizing with start up relaxation
 		
 		//Others
 		std::vector<std::pair<int,int> > ordV;
@@ -174,29 +164,33 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		void buildFixAndRelaxHorizontalModel(IloEnv& env, Instance inst, const int& outVessels); 
 		void buildFixAndRelaxHVModel(IloEnv& env,Instance inst, const double& nIntervals, const int& endBlock, const int& outVessels);
 		void setParameters(IloEnv& env, const double& timeLimit, const double& gap);
-		void fixSolution(IloEnv& env, Instance inst, const int& t3S, const int& t3F, const int& p);
+		void fixSolution(IloEnv& env, Instance inst, const int& t3S, const int& t3F, const int& p, const bool& fixSinkArc);
 		void modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const int& tS_fix, const int& tF_fix, const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int);
 		void fixAllSolution(IloEnv& env, const Instance& inst);
 		void decreaseEndBlock (IloEnv& env, Instance inst, const double& nIntervals, const int& t2S, const int& t2F); //Add to the model FO and constranints the variables between t2S and t2F
 		void reIntegralize(IloEnv& env, Instance inst, const int& t1S, const int& t1F);
-		void improvementPhase(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent);
+		void improvementPhase_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent);
 		void unFixInterval(Instance inst, const int& tS, const int& tF);
-		void fixAndOptmizeH(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, double& obj1stPhase, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time);
+		void improvementPhase_vessels(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, double& obj1stPhase, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time);
 		void fixVessel(IloEnv env,Instance inst, const int& v);
 		void fixVesselPair(IloEnv env, Instance inst, const int& v,const int& v1);
 		void fixVesselInterval(IloEnv env,Instance inst, const int& v,const int& tS, const int& tF);
 		void unFixVessel(Instance inst, const int& v);
 		void polish(IloEnv& env, Instance inst,const double& timeLimit, const double& gap);
-		void printSolution(IloEnv env, Instance& inst);
+		void printSolution(IloEnv env, Instance inst, const int& tF);
 		void getSolVals(IloEnv& env, const Instance& inst);
-		void getSolValsW(IloEnv& env, Instance inst, const int& tS, const int& tF);
+		void getSolValsW(IloEnv& env, Instance inst, const int& tS, const int& tF, const bool& fixSinkArc);
 		void addVesselToModel(IloEnv& env,Instance inst, const int& vAdd);
 		void addVesselIntervalToModel(IloEnv& env,Instance inst, const int& vAdd, const double& nIntervals, const int& tS, const int& tF, const int& outVessels, const int& itInt);
 		void integralizeVessel(const Instance& inst, const int& vInt);
 		void integralizeVesselInterval(Instance inst, const int& vInt, const int& tS, const int& tF);
 		void resetObjFunction(IloEnv& env, Instance inst);
 		void fixVesselLessInterval(IloEnv env, Instance inst, const int& v, const int& tS, const int& tF);
-		void fixAndOptTW(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);		
-		void typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<std::chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);
+		void improvementPhase_intervalVessel(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, 
+			const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time, 
+			const double& timeLimit, float& elapsed_time, double& incumbent);
+		
+		void improvementPhase_typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<std::chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);
+		void warmStart(IloEnv env, Instance inst, const double& timePerIter);
 	};
 }
