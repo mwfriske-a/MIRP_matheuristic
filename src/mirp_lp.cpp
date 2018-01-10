@@ -24,7 +24,7 @@
 #define NBranchingX			//Branching rule on summing variable x
 #define NBranchingOA		//Branching rule on summing variable OA -- Only allowed when WaitAfterOperate is turned of
 #define NRelaxation
-#define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
+//~ #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
 #define NKnapsackInequalities
 #define NSimplifyModel					//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 
@@ -986,7 +986,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 	#endif
 }
 
-void Model::printSolution(IloEnv env, Instance& inst){
+void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 	int i,j,t,v,a;
 	int J = inst.numTotalPorts;
 	int T = inst.t + 1;			//Init time-periods in 1
@@ -1042,7 +1042,7 @@ void Model::printSolution(IloEnv env, Instance& inst){
 				fWValue[v][i] = IloNumArray(env,T);
 				fWBValue[v][i] = IloNumArray(env,T);
 				
-				for(t=1;t<T;t++){
+				for(t=1;t<=tF;t++){
                     fValue[v][i][t] = cplex.getValue(f[v][i][t]);
                     revenue2 += fValue[v][i][t]*inst.r_jt[i-1][t-1];
 					if(hasEnteringArc1st[v][i][t]){
@@ -1059,7 +1059,7 @@ void Model::printSolution(IloEnv env, Instance& inst){
 						revenue += fValue[v][i][t]*inst.r_jt[i-1][t-1];
 						
 						foAValue[v][i][t] = cplex.getValue(fOA[v][i][t]);
-						if(t<T-1){ //Variables not associated with last time index
+						if(t<tF-1){ //Variables not associated with last time index
 							wValue[v][i][t] = cplex.getValue(w[v][i][t]);
 							#ifndef WaitAfterOperate
 							oBValue[v][i][t] = cplex.getValue(oB[v][i][t]);	
@@ -1076,17 +1076,26 @@ void Model::printSolution(IloEnv env, Instance& inst){
 			}
 			xValue[v][i] = IloArray<IloNumArray>(env,N);
 			fXValue[v][i] = IloArray<IloNumArray>(env,N);
-			for(j=0;j<N;j++){
+			for(j=1;j<N;j++){
 				xValue[v][i][j] = IloNumArray(env,T);
 				fXValue[v][i][j] = IloNumArray(env,T);
-				for(t=0;t<T;t++){
+				for(t=0;t<=tF;t++){                    
                     if(hasArc[v][i][j][t] == 1){ // Only if the arc exists
-						xValue[v][i][j][t] = cplex.getValue(x[v][i][j][t]);
-						fXValue[v][i][j][t] = cplex.getValue(fX[v][i][j][t]);
-						if(xValue[v][i][j][t] >= 0.1){
-							costArc += arcCost[v][i][j][t];
-                            costArc2 += xValue[v][i][j][t]*arcCost[v][i][j][t];
-						}                                                
+						if(j==N-1 || (i>0 && i<=J && j<=J && t+inst.travelTime[v][i-1][j-1] <= tF)){    //Arcs in the model              
+                            xValue[v][i][j][t] = cplex.getValue(x[v][i][j][t]);
+                            fXValue[v][i][j][t] = cplex.getValue(fX[v][i][j][t]);
+                            if(xValue[v][i][j][t] >= 0.1){
+                                costArc += arcCost[v][i][j][t];
+                                costArc2 += xValue[v][i][j][t]*arcCost[v][i][j][t];
+                            }        
+                        }else if (i==0){ //Depart arc
+                            xValue[v][i][j][t] = cplex.getValue(x[v][i][j][t]);
+                            fXValue[v][i][j][t] = cplex.getValue(fX[v][i][j][t]);
+                            if(xValue[v][i][j][t] >= 0.1){
+                                costArc += arcCost[v][i][j][t];
+                                costArc2 += xValue[v][i][j][t]*arcCost[v][i][j][t];
+                            }        
+                        }
 					}
 				}
 			}
@@ -1095,7 +1104,7 @@ void Model::printSolution(IloEnv env, Instance& inst){
 	for(i=1;i<=J;i++){
 		sPValue[i] = IloNumArray(env,T);
 		alphaValue[i] = IloNumArray(env,T);
-		for(t=0;t<T;t++){
+		for(t=0;t<=tF;t++){
 			sPValue[i][t] = cplex.getValue(sP[i][t]);
 			if(t>0){
 				alphaValue[i][t] = cplex.getValue(alpha[i][t]);
@@ -1112,30 +1121,30 @@ void Model::printSolution(IloEnv env, Instance& inst){
 	cout << "SOLUTION LOG: \n";
 	for(v=0;v<V;v++){
 		cout << "Vessel " << v << " route: " << endl;
-		for(i=0;i<N-1;i++){			
-			for(j=0;j<N;j++){	
-				for(t=0;t<T;t++){
-					if (i==0 && xValue[v][i][j][t]>=0.1) //Starting
+		for(i=0;i<N-1;i++){
+			for(j=1;j<N;j++){
+				for(t=0;t<=tF;t++){
+					if (i==0 && xValue[v][i][j][t]>=0.01) //Starting
 						cout << "Depart at (" << i << "," << t << ") -> (" << j << "," << t+inst.firstTimeAv[v]+1 << ") with load: " << fXValue[v][i][j][t] << " Cost: " << arcCost[v][i][j][t] << endl;
-					else if(xValue[v][i][j][t] >= 0.1 && j < N-1) //Travelling
+					else if(i>0 && i<=J && j<=J && t+inst.travelTime[v][i-1][j-1] <= tF && xValue[v][i][j][t] >= 0.01) //Travelling
 						cout << "Travel from (" << i << "," << t << ") -> (" << j << "," << t+inst.travelTime[v][i-1][j-1] << ") with load: " << fXValue[v][i][j][t] << " Cost: " << arcCost[v][i][j][t] << endl;
-					else if (j == N-1 && xValue[v][i][j][t] >= 0.1) //Sink arcs
+					else if (j == N-1 && xValue[v][i][j][t] >= 0.01) //Sink arcs
 						cout << "Exit system at (" << i << "," << t << ") with load: " << fXValue[v][i][j][t] << " Cost: " << arcCost[v][i][j][t] << endl;
 				}
 			}
 			if(i>0){
-				for(t=1;t<T;t++){
+				for(t=1;t<=tF;t++){
 					//~ if(hasEnteringArc1st[v][i][t]){
 						#ifndef WaitAfterOperate
-                        if(t<T-1 && wValue[v][i][t] >= 0.1)
+                        if(t<tF-1 && wValue[v][i][t] >= 0.01)
                             cout << "Waiting in (" << i << "," << t << ") with load: " << fWValue[v][i][t] << endl;
                         #endif
                         #ifdef WaitAfterOperate
-                        if(t<T-1 && (wValue[v][i][t] >= 0.1 || wBValue[v][i][t] >= 0.1))
+                        if(t<tF-1 && (wValue[v][i][t] >= 0.01 || wBValue[v][i][t] >= 0.01))
                             cout << "Waiting in (" << i << "," << t << ") with load (w/wB): " << fWValue[v][i][t] << "/" << fWBValue[v][i][t] << endl;
                         #endif
 							
-						if(zValue[v][i][t] >= 0.1){
+						if(zValue[v][i][t] >= 0.01){
 							if (t==1)
 								#ifndef WaitAfterOperate
                                 cout << "Operate at (" << i << "," << t << ") - oA= " << oAValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t] << endl;
@@ -1164,7 +1173,7 @@ void Model::printSolution(IloEnv env, Instance& inst){
 		}
 	}
     for(i=1;i<=J;i++){
-        for(t=0;t<T;t++){
+        for(t=0;t<=tF;t++){
             cout << "Port ("<<i<<","<<t<<") inventory: " << sPValue[i][t];
             if (alphaValue[i][t] > 0.00001){                
                 if(inst.typePort[i-1] == 0)
@@ -1215,10 +1224,10 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	cplex.setWarning(env.getNullStream());
 	cplex.setParam(IloCplex::Threads, 1);
 	//~ cplex.setParam(IloCplex::ConflictDisplay, 2); 
-	//~ cplex.setParam(IloCplex::MIPDisplay, 1); 
+	//~ cplex.setParam(IloCplex::MIPDisplay, 5); 
 	//~ cplex.setParam(IloCplex::MIPEmphasis, 4); // RINS
 	//~ cplex.setParam(IloCplex::DiveType, 3); // Guied dive
-	cplex.setParam(IloCplex::WorkMem, 8192);
+	//~ cplex.setParam(IloCplex::WorkMem, 8192);
 	cplex.setParam(IloCplex::NodeFileInd, 2);
 	cplex.setParam(IloCplex::WorkDir, "workDir/");
 	cplex.setParam(IloCplex::ClockType, 2);
@@ -1291,7 +1300,7 @@ void mirp::milp(string file, const double& timeLimit, string optStr){
 			cout << model.cplex.getNbinVars() << " \t & " << model.cplex.getNintVars() << " \t & " << model.cplex.getNcols() << " \t & " << model.cplex.getNrows() << " \t & "
 			<< "\t & \t & \t & \t & \t & \t" <<  opt_time << " & \t & \t & " << model.cplex.getNiterations() << " \t & " << model.cplex.getNnodes() << " \\\\";		
 		}
-		model.printSolution(env, inst);
+		model.printSolution(env, inst, T);
 	}catch (IloException& e) {
 	cerr << "Concert exception caught: " << e << endl;		
 	e.end();
