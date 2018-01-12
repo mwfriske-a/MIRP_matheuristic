@@ -14,7 +14,7 @@
 //~ #define WaitAfterOperate		//If defined, allows a vessel to wait after operated at a port.
 //~ #define NKnapsackInequalities
 #define NWWCCReformulation
-#define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
+//~ #define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 #define NFixSinkArc         
 #define NOperateAndDepart
 #define NModifiedFlow
@@ -184,7 +184,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                         }
                     }
 					ss << "fX_"<<v<<","<<j<<","<<i<<","<<t;
-					fX[v][j][i][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());                    
+					fX[v][j][i][t] = IloNumVar(env, 0, inst.q_v[v], ss.str().c_str());                    
 				}
 			}
 
@@ -230,6 +230,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					ss.str(string());
 					ss << "fOA_(" << j << "," << t << ")," << v;
 					fOA[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
+					//~ fOA[v][j][t] = IloNumVar(env, 0, inst.q_v[v], ss.str().c_str());
 					ss.str(string());
 					ss << "z_(" << j << "," << t << ")," << v;
 					z[v][j][t].setName(ss.str().c_str());
@@ -250,6 +251,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 						ss.str(string());
 						ss << "fW_(" << j << "," << t << ")," << v;
 						fW[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
+						//~ fW[v][j][t] = IloNumVar(env, 0, inst.q_v[v], ss.str().c_str());
                         
                         ss.str(string());
 						ss << "w_(" << j << "," << t << ")," << v;
@@ -263,6 +265,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                         ss.str(string());
 						ss << "fOB_(" << j << "," << t << ")," << v;
 						fOB[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
+						//~ fOB[v][j][t] = IloNumVar(env, 0, inst.q_v[v], ss.str().c_str());
                         
 						ss.str(string());
 						ss << "oB_(" << j << "," << t << ")," << v;
@@ -284,6 +287,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                         ss.str(string());
                         ss << "fWB_(" << j << "," << t << ")," << v;
                         fWB[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
+                        //~ fWB[v][j][t] = IloNumVar(env, 0, inst.q_v[v], ss.str().c_str());
                         #endif
 					}
 				}
@@ -320,11 +324,13 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                 #ifndef NBetas
                 ss.str(string());
 				ss << "beta_(" << i << "," << t << ")";
+				//~ beta[i][t] = IloNumVar(env, 0, inst.d_jt[i-1][t-1], ss.str().c_str());
 				beta[i][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
                 #endif 
                 #ifndef NThetas
                 ss.str(string());
 				ss << "theta_(" << i << "," << t << ")";
+				//~ theta[i][t] = IloNumVar(env, 0, inst.d_jt[i-1][t-1], ss.str().c_str());
 				theta[i][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
                 #endif                
 			}
@@ -348,12 +354,12 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		for (t=inst.firstTimeAv[v]+1;t<T;t++){		//and initial time available t
 			for(j=1;j<N-1;j++){						//Not necessary to account sink node
 				#ifdef NSimplifyModel
-				if (i != j){				
+				if (i != j){
 				#endif
 				#ifndef NSimplifyModel
-				if (i != j && (inst.typePort[i-1] != inst.typePort[j-1] || inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v]) ){
-                //~ if (inst.typePort[i-1] != inst.typePort[j-1] || 	//If ports are of different types
-					//~ (i != j && inst.typePort[i-1] == inst.typePort[j-1] && inst.idRegion[i-1] == inst.idRegion[j-1])){ //or if i and j are different, of the same type and of the same region
+				//~ if (i != j && (inst.typePort[i-1] != inst.typePort[j-1] || inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v]) ){
+                if (inst.typePort[i-1] != inst.typePort[j-1] || 	//If ports are of different types
+					(i != j && inst.typePort[i-1] == inst.typePort[j-1] && inst.idRegion[i-1] == inst.idRegion[j-1])){ //or if i and j are different, of the same type and of the same region
 				#endif
 					int t2 = t + inst.travelTime[v][i-1][j-1]; 
 					if (t2<T){ 	//If exists time to reach port j 
@@ -2812,7 +2818,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		Model model(env);
 		model.buildFixAndRelaxModel(env,inst, nIntervals, endBlock);
 		model.setParameters(env, timePerIterFirst, gapFirst);
-        model.cplex.exportModel("mip_R&F.lp");
+        //~ model.cplex.exportModel("mip_R&F.lp");
 		//Relax-and-fix
 		double p = T/nIntervals*(1-overLap/100); // Units of t that are add at each iteration to the model.
 		int s = T-(T/nIntervals*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
@@ -2835,11 +2841,11 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			t1S = ceil(sizeInterval+p*(v-1)+1);
 			t1F = min(ceil(sizeInterval+p*v),(double)T); 
 
-            cout << "Printing until time " << t2S-1 << endl;
+            //~ cout << "Printing until time " << t2S-1 << endl;
             //~ model.printSolution(env, inst, t2S-1);
 
 			model.modifyModel(env, inst, nIntervals, t3S, t3F, t2S, t2F, t1S, t1F);
-            model.cplex.exportModel("mip_R&F.lp");
+            //~ model.cplex.exportModel("mip_R&F.lp");
             
             #ifndef FixedGAP
             double newGap = max(0.001, (gapFirst - gapFirst/maxIt*v)/100);
