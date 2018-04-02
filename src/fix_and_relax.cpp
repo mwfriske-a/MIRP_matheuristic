@@ -9,16 +9,18 @@
 #define NDEBUG
 #include <assert.h>
 #define NBranching
-//~ #define NBetas  //Negative of alpha
-//~ #define NThetas //Plus of alpha
+#define NBetas  //Negative of alpha
+#define NThetas //Plus of alpha
 //~ #define WaitAfterOperate		//If defined, allows a vessel to wait after operated at a port.
 //~ #define NKnapsackInequalities
 #define NWWCCReformulation
+#define NStartUPValidInequalities
 //~ #define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 #define NFixSinkArc         
 #define NOperateAndDepart
-#define NModifiedFlow
+//~ #define NModifiedFlow
 //~ #define FixedGAP
+#define NImprovementPhase
 
 ILOSTLBEGIN
 
@@ -107,6 +109,13 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
     #ifndef NWWCCReformulation
 	wwcc_relaxation = IloArray<IloRangeArray>(env, N-1);
     #endif
+    
+    #ifndef NBranching
+    sumX = IntVarMatrix(env, V);
+    priorityX = IloArray<IloRangeArray>(env, V);
+    sumOA = IntVarMatrix(env, V) ;
+    priorityOA = IloArray<IloRangeArray>(env, V);
+    #endif
 
     for(v=0;v<V;v++){
 		f[v] = NumVarMatrix(env,N);
@@ -148,6 +157,13 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
         
         #ifndef NOperateAndDepart
         operateAndDepart[v] = IloArray<IloRangeArray> (env,N);
+        #endif
+        
+        #ifndef NBranching
+        sumX[v] = IloIntVarArray(env, J+1,0,IloInfinity);
+        priorityX[v] = IloRangeArray(env, J+1);
+        sumOA[v] = IloIntVarArray(env, J+1,0,IloInfinity);
+        priorityOA[v] = IloRangeArray(env, J+1);
         #endif
 
 		for(j=0;j<N;j++){
@@ -318,6 +334,10 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				ss.str(string());
 				ss << "sP_(" << i << "," << t << ")";
 				sP[i][t] = IloNumVar(env, inst.sMin_jt[i-1][0], inst.sMax_jt[i-1][0], ss.str().c_str()); //As the port capacity is fixed, always used the data from index 0
+				//~ if(inst.typePort[i-1]==0)
+                    //~ sP[i][t] = IloNumVar(env, -IloInfinity, inst.sMax_jt[i-1][0], ss.str().c_str());
+                //~ else
+                    //~ sP[i][t] = IloNumVar(env, inst.sMin_jt[i-1][0], IloInfinity, ss.str().c_str());
 				ss.str(string());
 				ss << "alpha_(" << i << "," << t << ")";
 				alpha[i][t] = IloNumVar(env, 0, inst.alp_max_jt[i-1][t-1], ss.str().c_str());
@@ -359,7 +379,8 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				#ifndef NSimplifyModel
 				//~ if (i != j && (inst.typePort[i-1] != inst.typePort[j-1] || inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v]) ){
                 if (inst.typePort[i-1] != inst.typePort[j-1] || 	//If ports are of different types
-					(i != j && inst.typePort[i-1] == inst.typePort[j-1] && inst.idRegion[i-1] == inst.idRegion[j-1])){ //or if i and j are different, of the same type and of the same region
+					(i != j && ((inst.typePort[i-1] == inst.typePort[j-1] && inst.idRegion[i-1] == inst.idRegion[j-1]) //or if i and j are different, of the same type and of the same region
+                    || (inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v])))){     //or if the sum of the minimum amount is greater than the vessel capacity
 				#endif
 					int t2 = t + inst.travelTime[v][i-1][j-1]; 
 					if (t2<T){ 	//If exists time to reach port j 
@@ -524,6 +545,17 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
     IloExpr expr_wwcc(env);
     int it_kt;
     #endif
+    
+    #ifndef NStartUPValidInequalities
+    startup_sumStartIfOperate = IloArray<IloRangeArray> (env, J+1);
+    startup_sumForceStartup = IloArray<IloRangeArray> (env, J+1);
+    startup_dlsccs = IloArray<IloRangeArray> (env, J);
+    startup_validInequality = IloArray<IloRangeArray> (env, J+1);
+    
+    IloExpr expr_sum_vInV_OA;
+    IloExpr expr_sum_vInV_O;
+    IloExpr expr_sum_vInV_O_t_1;
+    #endif
 	
 	#ifndef NKnapsackInequalities
 	knapsack_P_1 = IloArray<IloRangeArray> (env, J+1);			//Altough created for all J ports, it is only considered for loading(production) or consumption(discharging) ports. We create J+1 as index j starts with 1
@@ -637,9 +669,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                 kD1_RHS += -inst.sMax_jt[i-1][l-2] + inst.sMin_jt[i-1][k-1]; //equivalent 'l-1' and 'k' if index starts in 1                
             }
             kP2_RHS = max(0.0,ceil(kP1_RHS/inst.f_max_jt[i-1][0]));
-			kP1_RHS = max(0.0,ceil(kP1_RHS/inst.maxCapacity));
+			kP1_RHS = max(0.0,ceil(kP1_RHS/inst.maxVesselCapacity));
 			kD2_RHS = max(0.0,ceil(kD1_RHS/inst.f_max_jt[i-1][0]));
-			kD1_RHS = max(0.0,ceil(kD1_RHS/inst.maxCapacity));
+			kD1_RHS = max(0.0,ceil(kD1_RHS/inst.maxVesselCapacity));
 			
 			stringstream ss, ss1, ss2;
 			if(inst.typePort[i-1] == 0){
@@ -669,6 +701,46 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 			}
 		}
 		#endif
+        
+        #ifndef WaitAfterOperate
+        #ifndef NStartUPValidInequalities
+        startup_sumStartIfOperate[i] = IloRangeArray(env, T);
+        startup_sumForceStartup[i] = IloRangeArray(env, T);
+        startup_dlsccs[i] = IloRangeArray(env, T);
+        startup_validInequality[i] = IloRangeArray(env);
+        
+        //TODO after tested, implement in optimized format
+        for(t=1;t<=tOEB;t++){
+            expr_sum_vInV_O.clear();
+            expr_sum_vInV_O_t_1.clear();
+            expr_sum_vInV_OA.clear();
+            for(v=0;v<V;v++){
+                expr_sum_vInV_O += z[v][i][t];
+                expr_sum_vInV_OA += oA[v][i][t];
+                if(t>1)
+                    expr_sum_vInV_O_t_1 += z[v][i][t-1];
+            }
+            stringstream ss1,ss2,ss3;
+            ss1 << "startUp_sumStartIfOperate_(" << i << "," << t << ")";
+            ss2 << "startUp_sumForceStartUp_(" << i << "," << t << ")";
+            ss3 << "startUp_DLSCCS_(" << i << "," << t << ")";
+            startup_sumStartIfOperate[i][t] = IloRange(env, -IloInfinity, expr_sum_vInV_OA - expr_sum_vInV_O, 0, ss1.str().c_str());
+            model.add(startup_sumStartIfOperate[i][t]);
+            startup_sumForceStartup[i][t] = IloRange(env, -IloInfinity, expr_sum_vInV_O - expr_sum_vInV_O_t_1 - expr_sum_vInV_OA, 0, ss2.str().c_str());
+            model.add(startup_sumForceStartup[i][t]);
+            
+            expr_sum_vInV_O.clear();
+            for(int u=1;u<=t;u++){
+                for(v=0;v<V;v++)
+                    expr_sum_vInV_O += z[v][i][t];
+            }
+            startup_dlsccs[i][t] = IloRange(env, inst.lb_oper_jt[i-1][t-1], expr_sum_vInV_O, IloInfinity, ss3.str().c_str());
+            model.add(startup_dlsccs[i][t]);
+            
+            //~ cplex.addUserCut();
+        }
+        #endif
+        #endif
 		
 		for(t=1;t<=tOEB;t++){
 			expr_berth.clear();
@@ -757,7 +829,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		}
 		ss1 << "cum_slack("<<i<<")";
 		cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
-		model.add(cumSlack[i]);        
+		model.add(cumSlack[i]);   
+        
+             
 	}
     //~ cout << "it_kt = " << it_kt << endl;
 	expr_cumSlack.end();
@@ -809,7 +883,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				firstLevelFlow[v][i] = IloRangeArray(env,T,0,0); 
 				secondLevelFlow[v][i] = IloRangeArray(env,T,0,0); 
 				#ifndef WaitAfterOperate
-				linkBalance[v][i] = IloRangeArray(env,T,0,0); 
+				linkBalance[v][i] = IloRangeArray(env,T,-IloInfinity,0); 
 				#endif
 				travelAtCapacity[v][i] = IloArray<IloRangeArray> (env, N);
 				travelEmpty[v][i] = IloArray<IloRangeArray> (env, N);
@@ -872,6 +946,11 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				flowMinCapacityWB[v][i] = IloRangeArray(env,T);
 				#endif
                 #endif
+
+                #ifndef NBranching
+                IloExpr expr_sumEnteringX(env);
+                IloExpr expr_sumOA(env);                    
+                #endif
 				
 				for(t=1;t<=tOEB;t++){
 					stringstream ss, ss1, ss2, ss3, ss4, ss5, ss6, ss7, ss8, ss9, ss10, ss11;
@@ -901,12 +980,18 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 								expr_1stLevel += x[v][j][i][0];
 								expr_1stFlow += fX[v][j][i][0];
 								fX[v][j][i][0].setBounds(inst.s_v0[v], inst.s_v0[v]); //Fixing initial inventory 
+                                #ifndef NBranching
+                                expr_sumEnteringX += x[v][j][i][0];
+                                #endif
 							}
 							else if (j>0){ //When j is a port
 								if (t - inst.travelTime[v][j-1][i-1] >= 0){ //If is possible to exist an arc from j to i
 									if(hasArc[v][j][i][t-inst.travelTime[v][j-1][i-1]] == 1){ //If the arc exists
 										expr_1stLevel += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
 										expr_1stFlow += fX[v][j][i][t-inst.travelTime[v][j-1][i-1]];
+                                        #ifndef NBranching
+                                        expr_sumEnteringX += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
+                                        #endif
 									}
 								}                                
 							}
@@ -1096,11 +1181,23 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                         #endif
 						#endif
 					}
+                    
+                    #ifndef NBranching                    
+                        expr_sumOA += oA[v][i][t];
+                    #endif
 				}
                 flowCapacityX[v][i] = IloArray<IloRangeArray>(env,N);
                 #ifndef NModifiedFlow
                 flowMinCapacityX[v][i] = IloArray<IloRangeArray>(env,N);
                 #endif
+                
+                #ifndef NBranching                
+                priorityX[v][i] = IloRange(env, 0, expr_sumEnteringX - sumX[v][i], 0);
+                model.add(priorityX[v][i]);
+                
+                priorityOA[v][i] = IloRange(env, 0, expr_sumOA - sumOA[v][i], 0);
+                model.add(priorityOA[v][i]);   
+                #endif 
 				for(j=1;j<N;j++){ //No arriving arc in source arc j=0
 					if(i != j && i < N-1){ //There is no departing arc from sink node
 						flowCapacityX[v][i][j] = IloRangeArray(env,T);
@@ -1151,7 +1248,12 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	
 	
 	#ifndef NBranching
-		
+    for(v=0;v<V;v++){
+        for(i=1;i<=J;i++){
+            cplex.setPriority(sumX[v][i],2);
+            cplex.setPriority(sumOA[v][i],1);
+        }
+    }
 	#endif
 	
 	#ifndef NOperateAndGo
@@ -1567,9 +1669,9 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
                                 kD1_RHS += -inst.sMax_jt[i-1][l-2] + inst.sMin_jt[i-1][k-1];                                
                             }                                
                             kP2_RHS = max(0.0,ceil(kP1_RHS/inst.f_max_jt[i-1][0]));
-							kP1_RHS = max(0.0,ceil(kP1_RHS/inst.maxCapacity));
+							kP1_RHS = max(0.0,ceil(kP1_RHS/inst.maxVesselCapacity));
 							kD2_RHS = max(0.0,ceil(kD1_RHS/inst.f_max_jt[i-1][0]));
-							kD1_RHS = max(0.0,ceil(kD1_RHS/inst.maxCapacity));
+							kD1_RHS = max(0.0,ceil(kD1_RHS/inst.maxVesselCapacity));
 							
 							stringstream ss, ss1, ss2;
 							if(inst.typePort[i-1] == 0){
@@ -1854,6 +1956,10 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 			}
 			///Need another time iterator (v,i,t) - only for decrease endBlock
 			if(tS_add <= T){
+                #ifndef NBranching
+                IloExpr expr_sumEnteringX = priorityX[v][i].getExpr();
+                IloExpr expr_sumOA = priorityOA[v][i].getExpr();
+                #endif
 				t0 = max(1, tS_add-(int)inst.max_travelTime[v]);
 				for(t=t0;t<=tF_add;t++){
 					if(t<tS_add){   ///Needed for update outgoing flow balance arcs (just 2nd level)
@@ -1904,11 +2010,14 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 						expr_opd.clear();
 						#endif
 						for(int j1=0;j1<=N;j1++){
-							if(j1>0 && j1<N){ //No consider sink arc (first level balance)
+							if(j1> 0 && j1<N){ //No consider sink arc (first level balance)
 								if (t - inst.travelTime[v][j1-1][i-1] >= 0){ //If it is possible to exist an arc from j1 to i
 									if(hasArc[v][j1][i][t-inst.travelTime[v][j1-1][i-1]] == 1){ //If the arc exists
 										expr_1stLevel += x[v][j1][i][t-inst.travelTime[v][j1-1][i-1]];
 										expr_1stFlow += fX[v][j1][i][t-inst.travelTime[v][j1-1][i-1]];
+                                        #ifndef NBranching
+                                        expr_sumEnteringX += x[v][j1][i][t-inst.travelTime[v][j1-1][i-1]];
+                                        #endif
 									}
 								}
 							}
@@ -1993,7 +2102,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t];
 						}else{ //t<tF and hasEnteringArc1st = 1
 							expr_1stLevel += w[v][i][t-1] - w[v][i][t] - z[v][i][t] + wB[v][i][t-1];
-							expr_2ndLevel += - z[v][i][t] + wB[v][i][t];	
+							expr_2ndLevel += - z[v][i][t] + wB[v][i][t];
 							expr_1stFlow += fW[v][i][t-1] - fW[v][i][t] - fOA[v][i][t] + fWB[v][i][t-1];
 							expr_2ndFlow += -fOA[v][i][t] - inst.delta[i-1]*f[v][i][t] + fWB[v][i][t];
 						}
@@ -2142,10 +2251,17 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
                             }
                             #endif
                         }
+                        #ifndef NBranching
+                        expr_sumOA += oA[v][i][t];
+                        #endif
 					}
 				}
 				if(v==0)
 					cumSlack[i].setExpr(expr_cumSlack);
+                #ifndef NBranching
+                priorityX[v][i].setExpr(expr_sumEnteringX);
+                priorityOA[v][i].setExpr(expr_sumOA);
+                #endif
 			}
 		}
 		if(tS_add <= T)
@@ -2160,7 +2276,6 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, 
     const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,
     float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent){
-        
     double prevObj = 1.0e+10;
 	double objValue = incumbent;
 	int i;
@@ -2868,6 +2983,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		
         //~ model.warmStart(env,inst,timePerIterSecond);
         
+        #ifndef NImprovementPhase
 		cout << "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
         cout << "Fix all solution \n";
         model.fixAllSolution(env, inst);
@@ -2875,23 +2991,26 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
         double tLimit=0;
         
         model.improvementPhase_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+        timeLimit/3, elapsed_time, incumbent);
+        
+        tLimit = (timeLimit - elapsed_time/1000)/2;        
+        cout << "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;        
+		model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, tLimit, elapsed_time);
+
+        //~ tLimit = (timeLimit - elapsed_time/1000);
+        //~ cout << "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;
+        model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
         timeLimit, elapsed_time, incumbent);
         
-        //~ tLimit = timeLimit/2;
-		//~ model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, tLimit, elapsed_time);
-        
-        //~ tLimit = (timeLimit - elapsed_time/1000);
-        //~ model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        //~ timeLimit/2, elapsed_time, incumbent);
-        
-		model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, timeLimit, elapsed_time, incumbent);
+		//~ model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, timeLimit, elapsed_time, incumbent);
 		
         
         ///SOMENTE NESCESSARIO PARA OBTENÇÃO DE SOLUÇÃO COMPLETA
         model.cplex.setParam(IloCplex::TiLim, 1);        
         model.cplex.solve();
         ///
-
+        #endif
+        
 		global_time += timer_global.total();
 		time2ndPhase = elapsed_time;//global_time - time1stPhase;
 		obj2ndPhase	= incumbent;//model.cplex.getObjValue();
@@ -2905,11 +3024,15 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		double totalBeta=0;
 		double totalTheta=0;
 		IloArray<IloNumArray> betaVals(env, J+1); 
+		IloArray<IloNumArray> thetaVals(env, J+1); 
 		for(j=1;j<=J;j++){
 			betaVals[j] = IloNumArray(env, T+1);
+			thetaVals[j] = IloNumArray(env, T+1);
 			for(t=1;t<=T;t++){
                 betaVals[j][t] = model.cplex.getValue(model.beta[j][t]);
                 totalBeta += betaVals[j][t];
+                thetaVals[j][t] = model.cplex.getValue(model.theta[j][t]);
+                totalTheta += thetaVals[j][t];
             }
 		}
 		#endif
@@ -2918,6 +3041,9 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		
 		#ifndef NBetas
 		cout << "Total betas = " << totalBeta << endl;
+		#endif
+        #ifndef NThetas
+		cout << "Total thetas = " << totalTheta << endl;
 		#endif
 		
 		cout << "First phase -> n : " << nIntervals << " GAP: " << gapFirst << "; Overlap: " << overLap << "%; |EndBlock| " << endBlock << "; Time per block " << timePerIterFirst

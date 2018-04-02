@@ -152,6 +152,17 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		IloArray<IloRangeArray> wwcc_relaxation;
 		
 		//Lot-sizing with start up relaxation
+		IloArray<IloRangeArray> startup_sumStartIfOperate;  //(i,t)
+		IloArray<IloRangeArray> startup_sumForceStartup; 	//(i,t)
+		IloArray<IloRangeArray> startup_dlsccs;				//(i,t)
+		IloArray<IloRangeArray> startup_validInequality;	//(i,x), where x is a combination in funcion of [k,l] and p
+		
+	
+		///Branching rules
+		IntVarMatrix sumX;
+		IloArray<IloRangeArray> priorityX;
+		IntVarMatrix sumOA;
+		IloArray<IloRangeArray> priorityOA;
 		
 		//Others
 		std::vector<std::pair<int,int> > ordV;

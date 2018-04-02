@@ -1043,31 +1043,41 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 				fWBValue[v][i] = IloNumArray(env,T);
 				
 				for(t=1;t<=tF;t++){
+                    //~ cout << "Getting f value" << endl;
                     fValue[v][i][t] = cplex.getValue(f[v][i][t]);
                     revenue2 += fValue[v][i][t]*inst.r_jt[i-1][t-1];
 					if(hasEnteringArc1st[v][i][t]){
-						zValue[v][i][t] = cplex.getValue(z[v][i][t]);
+						//~ cout << "Getting z value" << endl;
+                        zValue[v][i][t] = cplex.getValue(z[v][i][t]);
 						//~ cout << "Z value " << v << " " << i << " " << t << " " << zValue[v][i][t] << endl;
 						if(zValue[v][i][t]>=0.1)
 							costAtempt += (t-1)*inst.attemptCost;
 						#ifndef WaitAfterOperate
-						oAValue[v][i][t] = cplex.getValue(oA[v][i][t]);
+						//~ cout << "Getting oA value" << endl;
+                        oAValue[v][i][t] = cplex.getValue(oA[v][i][t]);
 						#endif
 						
 						//~ fValue[v][i][t] = cplex.getValue(f[v][i][t]);
 						//~ if(zValue[v][i][t]>=0.1)
 						revenue += fValue[v][i][t]*inst.r_jt[i-1][t-1];
 						
-						foAValue[v][i][t] = cplex.getValue(fOA[v][i][t]);
+						//~ cout << "Getting fOA value" << endl;
+                        foAValue[v][i][t] = cplex.getValue(fOA[v][i][t]);
 						if(t<tF-1){ //Variables not associated with last time index
-							wValue[v][i][t] = cplex.getValue(w[v][i][t]);
+							//~ cout << "Getting w value" << endl;
+                            wValue[v][i][t] = cplex.getValue(w[v][i][t]);
 							#ifndef WaitAfterOperate
-							oBValue[v][i][t] = cplex.getValue(oB[v][i][t]);	
-							foBValue[v][i][t] = cplex.getValue(fOB[v][i][t]);
+							//~ cout << "Getting oB value" << endl;
+                            oBValue[v][i][t] = cplex.getValue(oB[v][i][t]);	
+							//~ cout << "Getting foB value" << endl;
+                            foBValue[v][i][t] = cplex.getValue(fOB[v][i][t]);
 							#endif
-							fWValue[v][i][t] = cplex.getValue(fW[v][i][t]);	
+							//~ cout << "Getting fW value" << endl;
+                            fWValue[v][i][t] = cplex.getValue(fW[v][i][t]);	
                             #ifdef WaitAfterOperate
+                            //~ cout << "Getting wB value" << endl;
                             wBValue[v][i][t] = cplex.getValue(wB[v][i][t]);
+                            //~ cout << "Getting fWB value" << endl;
                             fWBValue[v][i][t] = cplex.getValue(fWB[v][i][t]);
                             #endif
 						}
@@ -1082,14 +1092,18 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 				for(t=0;t<=tF;t++){                    
                     if(hasArc[v][i][j][t] == 1){ // Only if the arc exists
 						if(j==N-1 || (i>0 && i<=J && j<=J && t+inst.travelTime[v][i-1][j-1] <= tF)){    //Arcs in the model              
+                            //~ cout << "Getting x value" << endl;
                             xValue[v][i][j][t] = cplex.getValue(x[v][i][j][t]);
+                            //~ cout << "Getting fX value" << endl;
                             fXValue[v][i][j][t] = cplex.getValue(fX[v][i][j][t]);
                             if(xValue[v][i][j][t] >= 0.1){
                                 costArc += arcCost[v][i][j][t];
                                 costArc2 += xValue[v][i][j][t]*arcCost[v][i][j][t];
                             }        
                         }else if (i==0){ //Depart arc
+                            //~ cout << "Getting x depart value" << endl;
                             xValue[v][i][j][t] = cplex.getValue(x[v][i][j][t]);
+                            //~ cout << "Getting fX depart value" << endl;
                             fXValue[v][i][j][t] = cplex.getValue(fX[v][i][j][t]);
                             if(xValue[v][i][j][t] >= 0.1){
                                 costArc += arcCost[v][i][j][t];
@@ -1145,22 +1159,31 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
                         #endif
 							
 						if(zValue[v][i][t] >= 0.01){
-							if (t==1)
+							if (t==1){
 								#ifndef WaitAfterOperate
-                                cout << "Operate at (" << i << "," << t << ") - oA= " << oAValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t] << endl;
+                                cout << "Operate at (" << i << "," << t << ") - oA= " << oAValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t];                                
                                 #endif 
                                 #ifdef WaitAfterOperate
-                                cout << "Operate at (" << i << "," << t << ") - Z = " << zValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t] << endl;
+                                cout << "Operate at (" << i << "," << t << ") - Z = " << zValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t];
                                 #endif
-							else{
+                                if (fValue[v][i][t] < inst.f_min_jt[i-1][t-1])
+                                    cout << " less than the minimum " << inst.f_min_jt[i-1][t-1];
+                                else if (fValue[v][i][t] > inst.f_max_jt[i-1][t-1])
+                                    cout << "more than the maximum " << inst.f_max_jt[i-1][t-1];
+                                cout << endl;
+							}else{
                                 #ifndef WaitAfterOperate
 								cout << "Operate at (" << i << "," << t << ") - oA= " << oAValue[v][i][t] << "(" << foAValue[v][i][t] << ") oB= " << oBValue[v][i][t-1] << "(" << foBValue[v][i][t-1] << 
-								")- f= " << fValue[v][i][t] << endl;
+								")- f= " << fValue[v][i][t];
                                 #endif
                                 #ifdef WaitAfterOperate
-                                cout << "Operate at (" << i << "," << t << ") - Z= " << zValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t] << endl;
+                                cout << "Operate at (" << i << "," << t << ") - Z= " << zValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t];
                                 #endif
-                                
+                                if (fValue[v][i][t] < inst.f_min_jt[i-1][t-1])
+                                    cout << " less than the minimum " << inst.f_min_jt[i-1][t-1];
+                                else if (fValue[v][i][t] > inst.f_max_jt[i-1][t-1])
+                                    cout << "more than the maximum " << inst.f_max_jt[i-1][t-1];
+                                cout << endl;
 							}
 						}else{
 							if (fValue[v][i][t] > 0.01)

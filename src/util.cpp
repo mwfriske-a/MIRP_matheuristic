@@ -494,12 +494,12 @@ void Instance::readInstance(IloEnv& env, const string& name){
 	IloNumArray avgSpeedInKnots(env,vC);   
 	IloNumArray travelCostAsTermPerKm(env,vC);   
 	IloNumArray discountTravelingEmpty(env,vC);   
-	maxCapacity = 0;
+	maxVesselCapacity = 0;
 	for (i=0;i<vC;i++){
 		for (j=0;j<3;j++) getline(vClass,s);
 		stringstream(s) >> s1 >> capacity[i];
-		if(capacity[i] > maxCapacity)
-			maxCapacity = capacity[i];
+		if(capacity[i] > maxVesselCapacity)
+			maxVesselCapacity = capacity[i];
 		
 		getline(vClass,s);
 		stringstream(s) >> s1 >> avgSpeedInKnots[i];
@@ -663,20 +663,23 @@ void Instance::readInstance(IloEnv& env, const string& name){
 		lb_oper_jt[i] = IloNumArray(env,t);
 		delta_it[i] = IloNumArray(env,t);
 		p_delta_j = IloIntArray(env);
-		for(int ti=0;ti<t;ti++){			
+		//~ cout << "p_delta_"<<i << " = [";
+        for(int ti=0;ti<t;ti++){			
 			double value=0;
 			for(int u=0;u<=ti;u++){
 				value += dM_jt[i][u];
 			}
-			lb_oper_jt[i][ti] = ceil(value/maxCapacity);
+			lb_oper_jt[i][ti] = ceil(value/min(maxVesselCapacity,(int)f_max_jt[i][ti]));
 			//~ cout << i << " " << ti << ": "  << lb_oper_jt[i][ti] << endl;
 			if(ti == 0)
 				delta_it[i][ti] = lb_oper_jt[i][ti];
 			else
 				delta_it[i][ti] = lb_oper_jt[i][ti] - lb_oper_jt[i][ti-1];
 			if(delta_it[i][ti] == 1)
-				p_delta_j.add(ti);
-		}		
+				//~ cout << ti << ",";
+                p_delta_j.add(ti);
+		}
+        //~ cout << "]\n";
 	}
 	
 	

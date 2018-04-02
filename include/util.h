@@ -91,6 +91,8 @@ NumNumMatrix sMin_jt;		// lower bound of port j in time period t
 NumNumMatrix sMinM_jt;		// modified lower bound of port j in time period t - Only for discharging ports
 NumNumMatrix sMax_jt;		// capacity of port j in time period t
 NumNumMatrix sMaxM_jt;		// modified upper bound of port j in time period t - Only for loading ports 
+
+//For disxrete lot-sizing relaxation with constrait capacity and startup
 NumNumMatrix lb_oper_jt;	// Lower bound on the number of operating periods needed during the first t periods (depends of dM_jt) - = \tilde{O}_{it} defined in Agra et al 2013
 NumNumMatrix delta_it;		// Vector of diference of lb_oper_jt and lb_oper_j,t-1
 IloIntArray p_delta_j;		//Storage for each i \in J the index of delta_it in which delta_it = 1 (we will use the size of p_delta_j)
@@ -115,7 +117,7 @@ IloNumArray q_v; 			// Capacity of vessel v
 IloNumArray speed;			// Speed of vessel v
 IloNumArray costKm;			// Cost per km of vessel v
 IloNumArray trav_empt;		// Discont factor for traveling empty
-double maxCapacity;			// Maximum capacity between vessel classes;
+int maxVesselCapacity;			// Maximum capacity between vessel classes;
 IloNumArray max_travelTime;	// Maximum travel time between ports of one vessel
 int maxTravelTimeInstance;	//Maximum travel time of an instance
 //Identifiers
