@@ -18,9 +18,10 @@
 //~ #define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 #define NFixSinkArc         
 #define NOperateAndDepart
-//~ #define NModifiedFlow
+#define NModifiedFlow
 //~ #define FixedGAP
-#define NImprovementPhase
+//~ #define NImprovementPhase
+
 
 ILOSTLBEGIN
 
@@ -41,15 +42,15 @@ using mirp::Instance;
  */
 void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nIntervals, const int& endBlock){
 	int i, j,t,v,a;
-	int timePerInterval = inst.t/nIntervals; //Number of time periods in each interval
+	int timePerIntervalId = inst.t/nIntervals; //Number of time periods in each interval
 	int J = inst.numTotalPorts;
 	int T = inst.t+1;
 	double intPart;
-	int tOEB = inst.t - (timePerInterval*max(0.0,endBlock-modf(nIntervals, &intPart))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
+	int tOEB = inst.t - (timePerIntervalId*max(0.0,endBlock-modf(nIntervals, &intPart))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
 	int V = inst.speed.getSize(); //# of vessels
     int N = J + 2;
-	cout << "Building model...\n Integer Block: [0," << timePerInterval << 
-    "]\n Relaxed block: [" << timePerInterval+1 << "," << tOEB <<
+	cout << "Building model...\n Integer Block: [0," << timePerIntervalId << 
+    "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB <<
     "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
 	
     ///Variables, converters and arrays to storage the values
@@ -111,8 +112,8 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
     #endif
     
     #ifndef NBranching
-    sumX = IntVarMatrix(env, V);
-    priorityX = IloArray<IloRangeArray>(env, V);
+    //~ sumX = IntVarMatrix(env, V);
+    //~ priorityX = IloArray<IloRangeArray>(env, V);
     sumOA = IntVarMatrix(env, V) ;
     priorityOA = IloArray<IloRangeArray>(env, V);
     #endif
@@ -160,9 +161,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
         #endif
         
         #ifndef NBranching
-        sumX[v] = IloIntVarArray(env, J+1,0,IloInfinity);
-        priorityX[v] = IloRangeArray(env, J+1);
-        sumOA[v] = IloIntVarArray(env, J+1,0,IloInfinity);
+        //~ sumX[v] = IloIntVarArray(env, J+1,0,IloInfinity);
+        //~ priorityX[v] = IloRangeArray(env, J+1);
+        sumOA[v] = IloIntVarArray(env, J+1, 0,IloInfinity);
         priorityOA[v] = IloRangeArray(env, J+1);
         #endif
 
@@ -188,12 +189,12 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					ss.str(string());
                     if(j > 0 && j <= J){ //If j is a port
                         if (i > 0 && i <= J){ //If i is a port
-                            if(t + inst.travelTime[v][j-1][i-1] > timePerInterval){ 	//If the arrive time is out of first interval, relax it                                
+                            if(t + inst.travelTime[v][j-1][i-1] > timePerIntervalId){ 	//If the arrive time is out of first interval, relax it                                
                                 convertX[v][j][i][t] = IloConversion(env, x[v][j][i][t], ILOFLOAT);
                                 model.add(convertX[v][j][i][t]);
                             }
                         }else if (i == N-1){ // If i is the sink node
-                            if(t > timePerInterval){ 
+                            if(t > timePerIntervalId){ 
                                 convertX[v][j][i][t] = IloConversion(env, x[v][j][i][t], ILOFLOAT);
                                 model.add(convertX[v][j][i][t]);
                             }
@@ -250,7 +251,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					ss.str(string());
 					ss << "z_(" << j << "," << t << ")," << v;
 					z[v][j][t].setName(ss.str().c_str());
-                    if(t > timePerInterval){
+                    if(t > timePerIntervalId){
                         convertZ[v][j][t] = IloConversion(env, z[v][j][t], ILOFLOAT);
                         model.add(convertZ[v][j][t]);
                     }
@@ -258,7 +259,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					ss.str(string());
 					ss << "oA_(" << j << "," << t << ")," << v;
 					oA[v][j][t].setName(ss.str().c_str());
-                    if(t > timePerInterval){
+                    if(t > timePerIntervalId){
                         convertOA[v][j][t] = IloConversion(env, oA[v][j][t], ILOFLOAT);
                         model.add(convertOA[v][j][t]);
                     }
@@ -272,7 +273,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                         ss.str(string());
 						ss << "w_(" << j << "," << t << ")," << v;
 						w[v][j][t].setName(ss.str().c_str());
-                        if(t >= timePerInterval){       //Note the use of >= when considering 'horizontal' transition arcs
+                        if(t >= timePerIntervalId){       //Note the use of >= when considering 'horizontal' transition arcs
                             convertW[v][j][t] = IloConversion(env, w[v][j][t], ILOFLOAT);
                             model.add(convertW[v][j][t]);
                         }
@@ -286,7 +287,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 						ss.str(string());
 						ss << "oB_(" << j << "," << t << ")," << v;
 						oB[v][j][t].setName(ss.str().c_str());
-                        if(t >= timePerInterval){
+                        if(t >= timePerIntervalId){
                             convertOB[v][j][t] = IloConversion(env, oB[v][j][t], ILOFLOAT);
                             model.add(convertOB[v][j][t]);
                         }
@@ -296,7 +297,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                         ss.str(string());
                         ss << "wB_(" << j << "," << t << ")," << v;
                         wB[v][j][t].setName(ss.str().c_str());
-                        if(t >= timePerInterval){
+                        if(t >= timePerIntervalId){
                             convertWB[v][j][t] = IloConversion(env, wB[v][j][t], ILOFLOAT);
                             model.add(convertWB[v][j][t]);
                         }
@@ -334,10 +335,14 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				ss.str(string());
 				ss << "sP_(" << i << "," << t << ")";
 				sP[i][t] = IloNumVar(env, inst.sMin_jt[i-1][0], inst.sMax_jt[i-1][0], ss.str().c_str()); //As the port capacity is fixed, always used the data from index 0
-				//~ if(inst.typePort[i-1]==0)
+				//Unlimited port capacities in on leg
+                //~ if(inst.typePort[i-1]==0)
                     //~ sP[i][t] = IloNumVar(env, -IloInfinity, inst.sMax_jt[i-1][0], ss.str().c_str());
                 //~ else
                     //~ sP[i][t] = IloNumVar(env, inst.sMin_jt[i-1][0], IloInfinity, ss.str().c_str());
+                //Unlimited port capacity at all
+                //~ sP[i][t] = IloNumVar(env, -IloInfinity, IloInfinity, ss.str().c_str());
+                
 				ss.str(string());
 				ss << "alpha_(" << i << "," << t << ")";
 				alpha[i][t] = IloNumVar(env, 0, inst.alp_max_jt[i-1][t-1], ss.str().c_str());
@@ -463,10 +468,10 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		for(t=1;t<=tOEB;t++){			
 			expr1 += inst.p_jt[j-1][t-1]*alpha[j][t];									//4rd term
             #ifndef NBetas
-            expr1 += 1000*beta[j][t];
+            expr1 += 100*beta[j][t]; //100 may be enough
             #endif
             #ifndef NThetas
-            expr1 += 1000*theta[j][t];
+            expr1 += 100*theta[j][t];
             #endif
 		}
 	}
@@ -948,7 +953,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                 #endif
 
                 #ifndef NBranching
-                IloExpr expr_sumEnteringX(env);
+                //~ IloExpr expr_sumEnteringX(env);
                 IloExpr expr_sumOA(env);                    
                 #endif
 				
@@ -981,7 +986,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 								expr_1stFlow += fX[v][j][i][0];
 								fX[v][j][i][0].setBounds(inst.s_v0[v], inst.s_v0[v]); //Fixing initial inventory 
                                 #ifndef NBranching
-                                expr_sumEnteringX += x[v][j][i][0];
+                                //~ expr_sumEnteringX += x[v][j][i][0];
                                 #endif
 							}
 							else if (j>0){ //When j is a port
@@ -990,7 +995,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 										expr_1stLevel += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
 										expr_1stFlow += fX[v][j][i][t-inst.travelTime[v][j-1][i-1]];
                                         #ifndef NBranching
-                                        expr_sumEnteringX += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
+                                        //~ expr_sumEnteringX += x[v][j][i][t-inst.travelTime[v][j-1][i-1]];
                                         #endif
 									}
 								}                                
@@ -1192,8 +1197,8 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                 #endif
                 
                 #ifndef NBranching                
-                priorityX[v][i] = IloRange(env, 0, expr_sumEnteringX - sumX[v][i], 0);
-                model.add(priorityX[v][i]);
+                //~ priorityX[v][i] = IloRange(env, 0, expr_sumEnteringX - sumX[v][i], 0);
+                //~ model.add(priorityX[v][i]);
                 
                 priorityOA[v][i] = IloRange(env, 0, expr_sumOA - sumOA[v][i], 0);
                 model.add(priorityOA[v][i]);   
@@ -1250,7 +1255,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	#ifndef NBranching
     for(v=0;v<V;v++){
         for(i=1;i<=J;i++){
-            cplex.setPriority(sumX[v][i],2);
+            //~ cplex.setPriority(sumX[v][i],2);
             cplex.setPriority(sumOA[v][i],1);
         }
     }
@@ -1263,7 +1268,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	#ifndef N2PortNorevisit
 
 	#endif
-}	
+    
+    
+}
 
 /* Param p = 0 If algorithm can extract var solution values; 1 otherwise*/
 void Model::fixSolution(IloEnv& env, Instance inst, const int& tS, const int& tF,const int& p, const bool& fixSinkArc){
@@ -1459,7 +1466,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
     const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int){
 	int i,j,t,v,a, t0;
 	int T = inst.t;
-	int timePerInterval = T/nIntervals; //Number of time periods in each interval
+	int timePerIntervalId = T/nIntervals; //Number of time periods in each interval
 	int J = inst.numTotalPorts;	
 	double intPart;	
 	int V = inst.speed.getSize(); //# of vessels
@@ -1957,7 +1964,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 			///Need another time iterator (v,i,t) - only for decrease endBlock
 			if(tS_add <= T){
                 #ifndef NBranching
-                IloExpr expr_sumEnteringX = priorityX[v][i].getExpr();
+                //~ IloExpr expr_sumEnteringX = priorityX[v][i].getExpr();
                 IloExpr expr_sumOA = priorityOA[v][i].getExpr();
                 #endif
 				t0 = max(1, tS_add-(int)inst.max_travelTime[v]);
@@ -2016,7 +2023,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 										expr_1stLevel += x[v][j1][i][t-inst.travelTime[v][j1-1][i-1]];
 										expr_1stFlow += fX[v][j1][i][t-inst.travelTime[v][j1-1][i-1]];
                                         #ifndef NBranching
-                                        expr_sumEnteringX += x[v][j1][i][t-inst.travelTime[v][j1-1][i-1]];
+                                        //~ expr_sumEnteringX += x[v][j1][i][t-inst.travelTime[v][j1-1][i-1]];
                                         #endif
 									}
 								}
@@ -2259,7 +2266,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 				if(v==0)
 					cumSlack[i].setExpr(expr_cumSlack);
                 #ifndef NBranching
-                priorityX[v][i].setExpr(expr_sumEnteringX);
+                //~ priorityX[v][i].setExpr(expr_sumEnteringX);
                 priorityOA[v][i].setExpr(expr_sumOA);
                 #endif
 			}
@@ -2279,29 +2286,65 @@ void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const dou
     double prevObj = 1.0e+10;
 	double objValue = incumbent;
 	int i;
+    float percentageOfTime = 0.3; //Percentage in which the time in increased or decreased for each pair
 	Timer<chrono::milliseconds> timer_LS;
 	timer_LS.start();
 	cplex.setParam(IloCplex::TiLim, min(timePerIter, max(timeLimit-elapsed_time/1000,0.0)));
 	if (gap > 1e-04)
 		cplex.setParam(IloCplex::EpGap, gap/100);
 	int tS, tF;
+    int totalIntervals = ceil(mIntervals*(1+overlap/100));
+    vector <unsigned int> interVector; //Used for selecting intervals at random without repetitions
+    vector <pair <unsigned int,float> > intervalCoef;  // Controls the time coefficient according the evaluation of each interval <interval, coef>
+    srand(inst.t);
+    
+    //Feeding the vectors of intervals and time coefs.
+    for(i=1;i<=totalIntervals;i++){
+        intervalCoef.push_back(make_pair(i,1.0));
+    }
+    
 	while((prevObj - objValue > 0.0001) && elapsed_time/1000 < timeLimit){
-		for(i=1;i<=ceil(mIntervals*(1+overlap/100));i++){
-			if(i==1)
+		//Feed the vector of intervals
+        for(i=1;i<=totalIntervals;i++){
+            interVector.push_back(i);
+        }
+        for(i=1;i<=totalIntervals;i++){            
+			//Select an interval at random
+            int rIntervalId = iRand(0,interVector.size()-1); // index on intervals vector (0,m)
+            int intervalNumber = interVector[rIntervalId]; // number of the interval (1,m+1)
+            interVector.erase(interVector.begin()+rIntervalId); //remove the current interval
+            cout << "Selected interval = " << rIntervalId << "/" << intervalNumber << endl;
+            cout << "Current vector:[ ";
+            for (vector<unsigned int>::const_iterator it = interVector.begin(); it != interVector.end(); ++it)
+                cout << *it << ' ';
+            cout << "]" << endl;
+            cout << "Current coef vector:[ ";
+            for (int it=0;it<intervalCoef.size(); it++)            
+                cout << "(" << intervalCoef[it].first << "," << intervalCoef[it].second << ") , ";
+            cout << "]" << endl;
+            if(intervalNumber==1)
 				tS = 1;
 			else //Considering the overlap for itrations > 1
-				tS = inst.t/mIntervals*(i-1)*(1-overlap/100);
+				tS = inst.t/mIntervals*(intervalNumber-1)*(1-overlap/100);
 			tF = min(tS+inst.t/mIntervals, (double)inst.t);
-			cout << "Unfixing " << tS << "..." << tF << endl;
+			cout << "Unfixing interval " << intervalNumber << " = " << tS << "..." << tF << endl;
 			unFixInterval(inst, tS, tF);
-			cout << "Solving...\n";
-			cplex.setParam(IloCplex::TiLim, min(timePerIter, max(timeLimit-elapsed_time/1000,0.0)));
+			
+            cout << "Solving...\n";
+			cplex.setParam(IloCplex::TiLim, min(timePerIter*intervalCoef[intervalNumber-1].second, max(timeLimit-elapsed_time/1000,0.0)));
 			timer_cplex.start();
 			cplex.solve();
 			opt_time += timer_cplex.total();
 			elapsed_time += timer_LS.total();
 			incumbent = cplex.getObjValue();
-			if(elapsed_time/1000 >= timeLimit){
+            
+            //Increase or the decrease the time for the next iteration if improved the solution
+            if(objValue-incumbent > 0.0001)
+                intervalCoef[intervalNumber-1].second = intervalCoef[intervalNumber-1].second*(1+percentageOfTime);
+            else
+                intervalCoef[intervalNumber-1].second = intervalCoef[intervalNumber-1].second*(1-percentageOfTime);
+			
+            if(elapsed_time/1000 >= timeLimit){
 				cout << "Reached LS time limit " << timeLimit << ": " << elapsed_time/1000 << endl;
 				break;
 			}
@@ -2981,8 +3024,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		double incumbent = obj1stPhase;
 		cout << "Solution Status " << model.cplex.getStatus() << " Value: " << obj1stPhase << endl;
 		
-        //~ model.warmStart(env,inst,timePerIterSecond);
-        
+     
         #ifndef NImprovementPhase
 		cout << "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
         cout << "Fix all solution \n";
@@ -2990,20 +3032,23 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		
         double tLimit=0;
         
-        model.improvementPhase_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        timeLimit/3, elapsed_time, incumbent);
+        //~ model.improvementPhase_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+        //~ timeLimit/3, elapsed_time, incumbent);
         
         tLimit = (timeLimit - elapsed_time/1000)/2;        
         cout << "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;        
-		model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, tLimit, elapsed_time);
+		
 
         //~ tLimit = (timeLimit - elapsed_time/1000);
         //~ cout << "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;
         model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        timeLimit, elapsed_time, incumbent);
+        tLimit, elapsed_time, incumbent);
+        
+        model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
         
 		//~ model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, timeLimit, elapsed_time, incumbent);
 		
+        //~ model.warmStart(env,inst,timePerIterSecond*72);
         
         ///SOMENTE NESCESSARIO PARA OBTENÇÃO DE SOLUÇÃO COMPLETA
         model.cplex.setParam(IloCplex::TiLim, 1);        
