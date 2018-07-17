@@ -120,7 +120,7 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		
 		///Valid inequalities
 		//For multiples denominators
-		//Loading ports
+		//~ //Loading ports
 		//~ IloArray<IloArray<IloRangeArray> >knapsack_P_1; //Inequalities for the case where T_v = T (for each Q_v, j and it)
 		//~ IloArray<IloRangeArray> knapsack_P_2; //Inequalities for the case where T_v = \emptyset
 		//~ //Dischargin ports
@@ -132,6 +132,7 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		//~ #ifdef WaitAfterOperate
 		//~ IloArray<IloRangeArray>  knapsack_D_2; //Case R¹_v = T
 		//~ #endif
+		
 		//For one denominator
 		//Loading ports
 		IloArray<IloRangeArray> knapsack_P_1; //Inequalities for the case where T_v = T (for each Q_v, j and it)
