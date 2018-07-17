@@ -9,8 +9,8 @@
 #define NDEBUG
 #include <assert.h>
 #define NBranching
-#define NBetas  //Negative of alpha
-#define NThetas //Plus of alpha
+//~ #define NBetas  //Negative of alpha
+//~ #define NThetas //Plus of alpha
 //~ #define WaitAfterOperate		//If defined, allows a vessel to wait after operated at a port.
 //~ #define NKnapsackInequalities
 #define NWWCCReformulation
@@ -2313,7 +2313,7 @@ void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const dou
             int rIntervalId = iRand(0,interVector.size()-1); // index on intervals vector (0,m)
             int intervalNumber = interVector[rIntervalId]; // number of the interval (1,m+1)
             interVector.erase(interVector.begin()+rIntervalId); //remove the current interval
-            cout << "Selected interval = " << rIntervalId << "/" << intervalNumber << endl;
+            cout << "Selected interval = " << intervalNumber << endl;
             cout << "Current vector:[ ";
             for (vector<unsigned int>::const_iterator it = interVector.begin(); it != interVector.end(); ++it)
                 cout << *it << ' ';
@@ -2889,43 +2889,57 @@ const double& timeLimit, float& elapsed_time){
 	double currentObj = incumbent;
 	double previousObj = 1e+20;
 	float elapsed_local_time{0};
+    float coef = 0.3;
+    unsigned int combId;
 
 	//Get random pairs of vessels
-	int count, rId, v2, sumComb = 0;  
+	int count, rId, v2, sumC =0, sumComb = 0;  
 	double prevObj;
-	vector <pair<unsigned int,unsigned int> > vesselsComb;
+	vector <tuple<unsigned int,unsigned int, unsigned int> > vesselsComb;    // <id, v1, v2>
+    vector <pair<unsigned int, float> > vesselsCombTimeCoef;                 //<id, coef>
 	srand(V);
-
+    //Building vector of coeficients
+    sumC = 0;
+    for(v=0;v<V-1;v++){
+        for(v1=v+1;v1<V;v1++){
+            vesselsCombTimeCoef.push_back(make_pair(sumC,1));
+            sumC++;
+        }
+    }
 	while ((previousObj - currentObj > 0.0001) && 
         elapsed_local_time/1000 < timeLimit){
-		//Make pairs
+		//Build the combinations
 		sumComb = 0;
 		for(v=0;v<V-1;v++){
 			for(v1=v+1;v1<V;v1++){
-				vesselsComb.push_back(make_pair(v,v1));
+				vesselsComb.push_back(tuple<unsigned int,unsigned int,unsigned int> (sumComb,v,v1));
 				sumComb++;
 			}
 		}
 		for (int i=0;i<sumComb;i++){
 			cout << "Size: " << vesselsComb.size() << ": ";
 			rId = iRand(0,vesselsComb.size()-1);
-			v1 = vesselsComb[rId].first;
-			v2 = vesselsComb[rId].second;
+			combId = get<0>(vesselsComb[rId]); //Id of the combination -> used for iterate in the vesselsCombTimeCoef vector
+            v1 = get<1>(vesselsComb[rId]);
+			v2 = get<2>(vesselsComb[rId]);
 			vesselsComb.erase(vesselsComb.begin()+rId);
-			cout << "Improving vessels " << v1 << " and " << v2 << endl;
+			cout << "Improving vessels " << v1 << " and " << v2 << " Coef " << vesselsCombTimeCoef[combId].second << endl;
 			unFixVessel(inst,v1);
 			unFixVessel(inst,v2);
             
-			cplex.setParam(IloCplex::TiLim, min(timePerIter, max(timeLimit-elapsed_local_time/1000,0.0)));
+			cplex.setParam(IloCplex::TiLim, min(max(0.0,timePerIter*vesselsCombTimeCoef[combId].second), max(timeLimit-elapsed_local_time/1000,0.0)));
 			timer_cplex.start();
 			cplex.solve();
 			opt_time += timer_cplex.total();
 			prevObj = incumbent;
 			incumbent = cplex.getObjValue();
-			if(prevObj - incumbent > 0.0001)
-					count = 0;
-				else
-					count++;
+			if(prevObj - incumbent > 0.0001){
+                count = 0;
+                vesselsCombTimeCoef[combId].second = vesselsCombTimeCoef[combId].second*(1+coef); //Increase the time coeficient
+            }else{
+                count++;
+                vesselsCombTimeCoef[combId].second = vesselsCombTimeCoef[combId].second*(1-coef); //Decrease the time coeficient
+            }
 			cout << "Objective " << incumbent << endl;
 			fixVesselPair(env, inst, v1,v2); //Fix the 2 vessels
 			elapsed_local_time += timer_LS.total();
@@ -3044,7 +3058,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
         model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
         tLimit, elapsed_time, incumbent);
         
-        model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
+        //~ model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
         
 		//~ model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, timeLimit, elapsed_time, incumbent);
 		
