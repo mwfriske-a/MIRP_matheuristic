@@ -190,8 +190,10 @@ void Model::buildModel(IloEnv& env, Instance inst){
 		}
 	}
 
-	for(i=1;i<N-1;i++){		
+	for(i=1;i<N-1;i++){
+        #ifndef NSpotMarket
 		alpha[i] = IloNumVarArray(env,T);		
+        #endif
 		sP[i] = IloNumVarArray(env, T);		
 		for(t=0;t<T;t++){
 			stringstream ss;						
@@ -202,10 +204,11 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				ss.str(string());
 				ss << "sP_(" << i << "," << t << ")";				
 				sP[i][t] = IloNumVar(env,inst.sMin_jt[i-1][0], inst.sMax_jt[i-1][0], ss.str().c_str()); //As the port capacity is fixed, always used the data from index 0
-				
+				#ifndef NSpotMarket
 				ss.str(string());
 				ss << "alpha_(" << i << "," << t << ")";
 				alpha[i][t] = IloNumVar(env, 0, inst.alp_max_jt[i-1][t-1], ss.str().c_str());
+                #endif
 			}			
 		}		
 	}
@@ -299,12 +302,14 @@ void Model::buildModel(IloEnv& env, Instance inst){
 			}			
 		}		
 		
-	}	
+	}
+    #ifndef NSpotMarket
 	for(j=1;j<N-1;j++){
 		for(t=1;t<T;t++){			
 			expr1 += inst.p_jt[j-1][t-1]*alpha[j][t];									//4rd term
 		}
 	}
+    #endif
 	obj.setExpr(expr1-expr);	
 	model.add(obj);
 	
@@ -488,9 +493,10 @@ void Model::buildModel(IloEnv& env, Instance inst){
 				berthLimit[i][t] = IloRange(env,-IloInfinity, expr_berth, inst.b_j[i-1], ss.str().c_str());									
 				model.add(berthLimit[i][t]);
 			}
-			
+			#ifndef NSpotMarket
 			expr_cumSlack += alpha[i][t];
 			expr_invBalancePort += -alpha[i][t];
+            #endif
 			ss2 << "invBalancePort_(" << i << "," << t << ")";
 			portInventory[i][t] = IloRange(env, inst.delta[i-1]*inst.d_jt[i-1][t-1],
 				sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
@@ -498,9 +504,11 @@ void Model::buildModel(IloEnv& env, Instance inst){
 			model.add(portInventory[i][t]);
 			
 		}		
-		ss1 << "cum_slack("<<i<<")";
+		#ifndef NSpotMarket
+        ss1 << "cum_slack("<<i<<")";
 		cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
 		model.add(cumSlack[i]);
+        #endif
 		
 	}	
 	

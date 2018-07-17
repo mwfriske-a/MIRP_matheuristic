@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "../include/util.h"
 #include "../include/model.h"
-
+//~ #define NTestInstanceSet
 using namespace std;
 
 int main(const int argc, char** argv) {
@@ -33,6 +33,35 @@ stringstream file;
 string optstr;
 double timeLimit, gapFirst, gapSecond, overLap, mIntervals, nIntervals, overlap2;
 int opt, endBlock, outVessel, timePerIterFirst, timePerIterSecond, f ;
+vector <string> instances;
+instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_3_VC1_V7a/");
+instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_4_VC3_V11a/");
+instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_4_VC3_V12a/");
+instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_4_VC3_V12b/");
+instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_4_VC3_V8a/");
+instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_4_VC3_V9a/");
+instances.push_back("../Group1_data_format_only_files/LR1_2_DR1_3_VC2_V6a/");
+instances.push_back("../Group1_data_format_only_files/LR1_2_DR1_3_VC3_V8a/");
+instances.push_back("../Group1_data_format_only_files/LR2_11_DR2_22_VC3_V6a/");
+instances.push_back("../Group1_data_format_only_files/LR2_11_DR2_33_VC4_V11a/");
+instances.push_back("../Group1_data_format_only_files/LR2_11_DR2_33_VC5_V12a/");
+instances.push_back("../Group1_data_format_only_files/LR2_22_DR2_22_VC3_V10a/");
+instances.push_back("../Group1_data_format_only_files/LR2_22_DR3_333_VC4_V14a/");
+instances.push_back("../Group1_data_format_only_files/LR2_22_DR3_333_VC4_V17a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_3_VC1_V7a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V11a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V12a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V12b/");
+instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V8a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V9a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR1_2_DR1_3_VC2_V6a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR1_2_DR1_3_VC3_V8a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_22_VC3_V6a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC4_V11a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC5_V12a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR2_22_VC3_V10a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V14a/");
+instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V17a/");
 while ((opt = getopt(argc,argv,"v:p:f:t:y:s:n:g:o:e:r:l:m:i:h:u:")) != EOF)
 	switch(opt)
 	{
@@ -94,7 +123,14 @@ while ((opt = getopt(argc,argv,"v:p:f:t:y:s:n:g:o:e:r:l:m:i:h:u:")) != EOF)
 		if (endBlock + 2 > ceil(nIntervals)) {
 			cout << "Error! Size of end block must be at leat 2 units less than the number of intervals)" << endl;
 		}
-		mirp::fixAndRelax(file.str(), optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit);
+        #ifndef NTestInstanceSet
+        for(int i=0;i<instances.size();i++){
+            mirp::fixAndRelax(instances[i], optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit);
+        }
+        #endif
+        #ifdef NTestInstanceSet
+        mirp::fixAndRelax(file.str(), optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit);
+        #endif
 		break;
 	case 3:
 		//~ mirp::fixAndRelaxH(file.str(), optstr, gapFirst, outVessel, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond,overlap2);	

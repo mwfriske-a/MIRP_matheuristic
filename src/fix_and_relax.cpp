@@ -49,9 +49,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	int tOEB = inst.t - (timePerIntervalId*max(0.0,endBlock-modf(nIntervals, &intPart))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
 	int V = inst.speed.getSize(); //# of vessels
     int N = J + 2;
-	cout << "Building model...\n Integer Block: [0," << timePerIntervalId << 
-    "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB <<
-    "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
+	//~ cout << "Building model...\n Integer Block: [0," << timePerIntervalId << "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB << "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
 	
     ///Variables, converters and arrays to storage the values
     alpha = NumVarMatrix(env, N);    
@@ -615,7 +613,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				it2++;
 			}
 			//~ if(i==1)
-				//~ cout << it << " [" << l << "," << k << "]\n";
+				//~ //~ cout << it << " [" << l << "," << k << "]\n";
             for(v=0;v<V;v++){
 				#ifdef WaitAfterOperate
 				expr_kP1_LHS += wB[v][i][k];
@@ -823,11 +821,11 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                     }                    
                 }                
                 if(hasExpr || k>1){                    
-                    //~ cout << " " <<  expr_wwcc << " >= " << wwcc_rhs << endl;
+                    //~ //~ cout << " " <<  expr_wwcc << " >= " << wwcc_rhs << endl;
                     wwcc_relaxation[i][it_kt] = IloRange(env, wwcc_rhs, expr_wwcc, IloInfinity, ss3.str().c_str());                    
                     model.add(wwcc_relaxation[i][it_kt]);
                 }
-                //~ cout << ss3.str() << endl;
+                //~ //~ cout << ss3.str() << endl;
                 it_kt++;
             }
             #endif
@@ -838,7 +836,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
         
              
 	}
-    //~ cout << "it_kt = " << it_kt << endl;
+    //~ //~ cout << "it_kt = " << it_kt << endl;
 	expr_cumSlack.end();
 	expr_berth.end();
 	expr_invBalancePort.end();
@@ -1412,29 +1410,29 @@ void Model::getSolValsW(IloEnv& env, Instance inst, const int& tS, const int& tF
 						if (i == 1){ //(v,j,t) iterator
 							if(hasEnteringArc1st[v][j][t] == 1) {
 								zValue[v][j][t] = cplex.getValue(z[v][j][t]);
-								//~ cout << "z_["<<v<<"]["<<i<<"]["<<t<<"] = " << zValue[v][j][t] << endl;
+								//~ //~ cout << "z_["<<v<<"]["<<i<<"]["<<t<<"] = " << zValue[v][j][t] << endl;
 								
 								#ifndef WaitAfterOperate
 								oAValue[v][j][t] = cplex.getValue(oA[v][j][t]);
-								//~ cout << "oA_["<<v<<"]["<<i<<"]["<<t<<"] = " << oAValue[v][j][t] << endl;
+								//~ //~ cout << "oA_["<<v<<"]["<<i<<"]["<<t<<"] = " << oAValue[v][j][t] << endl;
 								#endif
 								
 								if(t<tF){
 									#ifndef WaitAfterOperate
 									oBValue[v][j][t] = cplex.getValue(oB[v][j][t]);
-									//~ cout << "oB_["<<v<<"]["<<i<<"]["<<t<<"] = " << oBValue[v][j][t] << endl;
+									//~ //~ cout << "oB_["<<v<<"]["<<i<<"]["<<t<<"] = " << oBValue[v][j][t] << endl;
 									#endif
 									#ifdef WaitAfterOperate
 									wBValue[v][j][t] = cplex.getValue(wB[v][j][t]);
-									//~ cout << "wB_["<<v<<"]["<<i<<"]["<<t<<"] = " << wBValue[v][j][t] << endl;
+									//~ //~ cout << "wB_["<<v<<"]["<<i<<"]["<<t<<"] = " << wBValue[v][j][t] << endl;
 									#endif                            
 									wValue[v][j][t] = cplex.getValue(w[v][j][t]);
-									//~ cout << "w_["<<v<<"]["<<i<<"]["<<t<<"] = " << wValue[v][j][t] << endl;
+									//~ //~ cout << "w_["<<v<<"]["<<i<<"]["<<t<<"] = " << wValue[v][j][t] << endl;
 								}								
 								if(fixSinkArc){
                                     xValue[v][j][N][t] = cplex.getValue(x[v][j][N][t]);  //Gets the value of sink arc
-                                    //~ cout << "x_["<<v<<"]["<<j<<"]["<<N<<"]["<<t<<"] = " << xValue[v][j][N][t] << endl;
-                                    //~ cout << "fx_["<<v<<"]["<<j<<"]["<<N<<"]["<<t<<"] = " << cplex.getValue(fX[v][j][N][t]) << endl;
+                                    //~ //~ cout << "x_["<<v<<"]["<<j<<"]["<<N<<"]["<<t<<"] = " << xValue[v][j][N][t] << endl;
+                                    //~ //~ cout << "fx_["<<v<<"]["<<j<<"]["<<N<<"]["<<t<<"] = " << cplex.getValue(fX[v][j][N][t]) << endl;
                                 }
 							}
 						}                                
@@ -1448,16 +1446,16 @@ void Model::getSolValsW(IloEnv& env, Instance inst, const int& tS, const int& tF
 						#endif
 						#ifdef WaitAfterOperate
 						wBValue[v][i][tS-1] = cplex.getValue(wB[v][i][tS-1]);
-                        //~ cout << "wb["<<v<<"]["<<i<<"["<<tS-1<<"] = " << wBValue[v][i][tS-1] << endl;
+                        //~ //~ cout << "wb["<<v<<"]["<<i<<"["<<tS-1<<"] = " << wBValue[v][i][tS-1] << endl;
 						#endif
                         wValue[v][i][tS-1] = cplex.getValue(w[v][i][tS-1]);                        
-                        //~ cout << "w["<<v<<"]["<<i<<"["<<tS-1<<"] = " << wValue[v][i][tS-1] << endl;
+                        //~ //~ cout << "w["<<v<<"]["<<i<<"["<<tS-1<<"] = " << wValue[v][i][tS-1] << endl;
 					}
                 }     
             }
         }
 	}else{
-		cout << "Impossible to get feasible solution values!" << endl;
+		//~ cout << "Impossible to get feasible solution values!" << endl;
 		exit(1);
 	}
 }
@@ -1473,16 +1471,16 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
     int N = J + 1;    	
 	//First gets the solution values for fixing (when needed)
 	if (tS_fix < T){		
-		cout << "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
+		//~ cout << "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
 		getSolValsW(env, inst, tS_fix, tF_fix, false);	//Get only values of the interval for fixing
 	}
 	
-	if (tS_int <= T)
-		cout << "Integralizing: [" << tS_int << "," << tF_int << "]\n";
+	//~ if (tS_int <= T)
+		//~ cout << "Integralizing: [" << tS_int << "," << tF_int << "]\n";
 	
 	///Removing end-block
-	if(tS_add <= T)
-		cout << "Adding to the model [" << tS_add << "," << tF_add << "]\n";
+	//~ if(tS_add <= T)
+		//~ cout << "Adding to the model [" << tS_add << "," << tF_add << "]\n";
 		
     ///Objective function	
 	IloExpr expr_obj_current = cplex.getObjective().getExpr(); //Gets the current objective function
@@ -1616,10 +1614,10 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
                             ( (it >= T-2 + tS_add-5 && it < T-2+tF_add-2) || (tF_add == T && it > T-2 + tS_add-5) ) ||
 							  (it >= T-2 && it < T-2 + tS_add-4)){ //Case of extending which is equivalent to add
 							//~ if(i==1){
-								//~ cout << "Adding new: " << it << " [" << l << "," << k << "]";
+								//~ //~ cout << "Adding new: " << it << " [" << l << "," << k << "]";
 								//~ if (it >= T-2 && it < T-2-1 + tS_add-2) //When updating the VI1
-									//~ cout << " - Replacing";
-								//~ cout << endl;
+									//~ //~ cout << " - Replacing";
+								//~ //~ cout << endl;
 							//~ }
 							for(int v1=0;v1<V;v1++){
 								#ifdef WaitAfterOperate
@@ -1737,7 +1735,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 							int t0 = max(1, tS_add-inst.maxTravelTimeInstance);
 							if(k >= t0){
 								//~ if(i==1)
-									//~ cout << "Updating  " << it << " ["<< l << "," << k << "]\n";
+									//~ //~ cout << "Updating  " << it << " ["<< l << "," << k << "]\n";
 								//Get the current expr values                 
 								if (inst.typePort[i-1] == 0)
 									expr_kP1_LHS = knapsack_P_1[i][it].getExpr();
@@ -2250,7 +2248,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
                                     }                                    
                                 }                
                                 if(hasExpr || k>1){                                    
-                                    //~ cout << " " <<  expr_wwcc << " >= " << wwcc_rhs << endl;
+                                    //~ //~ cout << " " <<  expr_wwcc << " >= " << wwcc_rhs << endl;
                                     wwcc_relaxation[i][it_kt] = IloRange(env, wwcc_rhs, expr_wwcc, IloInfinity, ss12.str().c_str());                    
                                     model.add(wwcc_relaxation[i][it_kt]); 
                                 }
@@ -2314,24 +2312,16 @@ void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const dou
             int rIntervalId = iRand(0,interVector.size()-1); // index on intervals vector (0,m)
             int intervalNumber = interVector[rIntervalId]; // number of the interval (1,m+1)
             interVector.erase(interVector.begin()+rIntervalId); //remove the current interval
-            cout << "Selected interval = " << intervalNumber << endl;
-            cout << "Current vector:[ ";
-            for (vector<unsigned int>::const_iterator it = interVector.begin(); it != interVector.end(); ++it)
-                cout << *it << ' ';
-            cout << "]" << endl;
-            cout << "Current coef vector:[ ";
-            for (int it=0;it<intervalCoef.size(); it++)            
-                cout << "(" << intervalCoef[it].first << "," << intervalCoef[it].second << ") , ";
-            cout << "]" << endl;
+            
             if(intervalNumber==1)
 				tS = 1;
 			else //Considering the overlap for itrations > 1
 				tS = inst.t/mIntervals*(intervalNumber-1)*(1-overlap/100);
 			tF = min(tS+inst.t/mIntervals, (double)inst.t);
-			cout << "Unfixing interval " << intervalNumber << " = " << tS << "..." << tF << endl;
+			//~ cout << "Unfixing interval " << intervalNumber << " = " << tS << "..." << tF << endl;
 			unFixInterval(inst, tS, tF);
 			
-            cout << "Solving...\n";
+            //~ cout << "Solving...\n";
 			cplex.setParam(IloCplex::TiLim, min(max(0.0,timePerIter*intervalCoef[intervalNumber-1].second), max(timeLimit-elapsed_time/1000,0.0)));
 			timer_cplex.start();
 			cplex.solve();
@@ -2346,20 +2336,20 @@ void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const dou
                 intervalCoef[intervalNumber-1].second = intervalCoef[intervalNumber-1].second*(1-percentageOfTime);
 			
             if(elapsed_time/1000 >= timeLimit){
-				cout << "Reached LS time limit " << timeLimit << ": " << elapsed_time/1000 << endl;
+				//~ cout << "Reached LS time limit " << timeLimit << ": " << elapsed_time/1000 << endl;
 				break;
 			}
 			timer_LS.start();
-			cout << "Objective: " << incumbent << endl;
-            cout << "Re-fixing " << tS << "..." << tF;
+			//~ cout << "Objective: " << incumbent << endl;
+            //~ cout << "Re-fixing " << tS << "..." << tF;
             fixSolution(env, inst, tS, tF,0,true);
-            cout << ". Done! " << endl;
+            //~ cout << ". Done! " << endl;
 
 		}
 		prevObj = objValue;
 		objValue = incumbent;
 		if(elapsed_time/1000 >= timeLimit){
-			cout << "Reached LS time limit " << timeLimit << ": " << elapsed_time/1000 << endl;
+			//~ cout << "Reached LS time limit " << timeLimit << ": " << elapsed_time/1000 << endl;
 			break;
 		}
 	}
@@ -2425,7 +2415,7 @@ const double& timeLimit, float& elapsed_time, double& incumbent){
 	while((prevObj - objValue > 0.0001) && elapsed_time/1000 < timeLimit){
 		prevObj = objValue;
 		for(i=1;i>=0;i--){ //Type region (first allow discharging region)
-			cout << "TYPE REGION = " << i << endl;
+			//~ cout << "TYPE REGION = " << i << endl;
 			///Allow region variables
             for(r=0;r<inst.identifyPort[i].getSize();r++){ //For each region
 				for(j=0;j<inst.identifyPort[i][r].getSize();j++){ //Port
@@ -2467,7 +2457,7 @@ const double& timeLimit, float& elapsed_time, double& incumbent){
 			opt_time += timer_cplex.total();
 			elapsed_time += timer_LS.total();
 			objValue = cplex.getObjValue();
-			cout << "Objective: " << objValue << endl << endl;
+			//~ cout << "Objective: " << objValue << endl << endl;
 			if(elapsed_time/1000 >= timeLimit){				
                 break;
 			}
@@ -2556,7 +2546,7 @@ void Model::warmStart(IloEnv env, Instance inst, const double& timePerIter){
     int N = J+1;
     int V = inst.speed.getSize();
     double objValue;
-	cout << "Warm starting..." << endl;    
+	//~ cout << "Warm starting..." << endl;    
     //Unfix all variables
     for(v=0;v<V;v++){
         for(i=1;i<=J;i++){
@@ -2590,7 +2580,7 @@ void Model::warmStart(IloEnv env, Instance inst, const double& timePerIter){
     cplex.setParam(IloCplex::TiLim, timePerIter);
     cplex.solve();    
     objValue = cplex.getObjValue();
-    cout << "Objective: " << objValue << endl;
+    //~ cout << "Objective: " << objValue << endl;
 }
 void Model::fixAllSolution(IloEnv& env, const Instance& inst){
     int v,i,j,t;
@@ -2739,7 +2729,7 @@ void Model::improvementPhase_intervalVessel(IloEnv& env, Instance inst, const do
     fill(combCoefVector.begin(),combCoefVector.end(),1);
 	
 	while((prevObj - objValue > 0.1) && elapsed_time/1000 <= timeLimit){
-		cout << "prevObj - objValue = " << prevObj - objValue << endl;
+		//~ cout << "prevObj - objValue = " << prevObj - objValue << endl;
         srand(sumIt++);
         for(i=1;i<=ceil(mIntervals);i++){
 			if(i==1)
@@ -2747,7 +2737,7 @@ void Model::improvementPhase_intervalVessel(IloEnv& env, Instance inst, const do
 			else
 				tS = inst.t/mIntervals*(i-1)*(1-overlap/100);
 			tF = min(tS+inst.t/mIntervals, (double)inst.t);
-			cout << "Unfixing interval " << tS << "..." << tF << endl;
+			//~ cout << "Unfixing interval " << tS << "..." << tF << endl;
 			unFixInterval(inst, tS, tF);
             for (v=0;v<V;v++){
                 vesselsVector.push_back(v);
@@ -2756,9 +2746,9 @@ void Model::improvementPhase_intervalVessel(IloEnv& env, Instance inst, const do
                 rId = iRand(0,vesselsVector.size()-1);
                 vId = vesselsVector[rId];
                 combId = (i-1)*V+vId;
-                cout << "Vessel id " << vId << " combId " << combId << endl;
+                //~ cout << "Vessel id " << vId << " combId " << combId << endl;
                 vesselsVector.erase(vesselsVector.begin()+rId);
-				cout << "Unfixing vessel " << vId << " coef " << combCoefVector[combId] << endl;
+				//~ cout << "Unfixing vessel " << vId << " coef " << combCoefVector[combId] << endl;
 				unFixVessel(inst,vId);
 				cplex.setParam(IloCplex::TiLim, min(max(0.0,timePerIter*combCoefVector[combId]), max(timeLimit-elapsed_time/1000,0.0)));
 				timer_cplex.start();
@@ -2768,7 +2758,7 @@ void Model::improvementPhase_intervalVessel(IloEnv& env, Instance inst, const do
 				timer_LS.start();
 				prevObj1 = objValue1;
 				objValue1 = cplex.getObjValue();
-				cout << "Objective: " << objValue1 << endl;
+				//~ cout << "Objective: " << objValue1 << endl;
                 //Update the vector coef
                 if(prevObj1-objValue1 > 0.0001)
                     combCoefVector[combId] = combCoefVector[combId]*(1+timeCoef);
@@ -2778,23 +2768,23 @@ void Model::improvementPhase_intervalVessel(IloEnv& env, Instance inst, const do
 				if(elapsed_time/1000 >= timeLimit){
 					break;
                 }else{
-                    cout << "Fixing vessel " << vId << endl;
+                    //~ cout << "Fixing vessel " << vId << endl;
                     fixVesselLessInterval(env,inst, vId, tS, tF); //Get all solution values
                 }
 			}
-            cout << "Re-fixing " << tS << "..." << tF;
+            //~ cout << "Re-fixing " << tS << "..." << tF;
             fixSolution(env, inst, tS, tF, 1,true);
-            cout << ". Done! " << endl;
+            //~ cout << ". Done! " << endl;
 
             if(elapsed_time/1000 >= timeLimit){
             break;
-            cout << "Stopped by time" << endl;
+            //~ cout << "Stopped by time" << endl;
 			}
 		}
 		prevObj = objValue;
 		objValue = objValue1;
 		if (elapsed_time/1000 >= timeLimit){
-			cout << "STOP by TIME \n";
+			//~ cout << "STOP by TIME \n";
 			break;
 		}
 	}
@@ -2941,13 +2931,13 @@ const double& timeLimit, float& elapsed_time){
 			}
 		}
 		for (int i=0;i<sumComb;i++){
-			cout << "Size: " << vesselsComb.size() << ": ";
+			//~ cout << "Size: " << vesselsComb.size() << ": ";
 			rId = iRand(0,vesselsComb.size()-1);
 			combId = get<0>(vesselsComb[rId]); //Id of the combination -> used for iterate in the vesselsCombTimeCoef vector
             v1 = get<1>(vesselsComb[rId]);
 			v2 = get<2>(vesselsComb[rId]);
 			vesselsComb.erase(vesselsComb.begin()+rId);
-			cout << "Improving vessels " << v1 << " and " << v2 << " Coef " << vesselsCombTimeCoef[combId].second << endl;
+			//~ cout << "Improving vessels " << v1 << " and " << v2 << " Coef " << vesselsCombTimeCoef[combId].second << endl;
 			unFixVessel(inst,v1);
 			unFixVessel(inst,v2);
             
@@ -2964,7 +2954,7 @@ const double& timeLimit, float& elapsed_time){
                 count++;
                 vesselsCombTimeCoef[combId].second = vesselsCombTimeCoef[combId].second*(1-coef); //Decrease the time coeficient
             }
-			cout << "Objective " << incumbent << endl;
+			//~ cout << "Objective " << incumbent << endl;
 			fixVesselPair(env, inst, v1,v2); //Fix the 2 vessels
 			elapsed_local_time += timer_LS.total();
 			if(elapsed_local_time/1000 >= timeLimit){
@@ -2972,7 +2962,7 @@ const double& timeLimit, float& elapsed_time){
 			}
 			timer_LS.start();
 		}
-        cout << endl;
+        //~ cout << endl;
 		previousObj = currentObj;
 		currentObj = incumbent;
 	}
@@ -2999,7 +2989,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		inst.readInstance(env, file);
 		//Verify if the number of intervals is compatible with the instance
 		if(fmod((double)inst.t ,nIntervals) != 0 || fmod((double)inst.t,mIntervals != 0)){
-			cout << "Error: the number of intervals n or m must be a divisor of Time instace without rest" << endl;
+			//~ cout << "Error: the number of intervals n or m must be a divisor of Time instace without rest" << endl;
 			exit(1);
 		}
 		
@@ -3022,11 +3012,12 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
         int maxIt = ceil((T-sizeInterval)/p);        
         for (v=1; v <= maxIt; v++){
 			timer_cplex.start();
-			cout << "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
-			if(!model.cplex.solve())
-				cout << model.cplex.getStatus() << endl;
+			//~ cout << "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
+			if(!model.cplex.solve()){
+				//~ cout << model.cplex.getStatus() << endl;
+            }
 			opt_time += timer_cplex.total();
-			cout << "Solution Status " << model.cplex.getStatus() << " Value: " << model.cplex.getObjValue() << endl;
+			//~ cout << "Solution Status " << model.cplex.getStatus() << " Value: " << model.cplex.getObjValue() << endl;
 			
 			t3S = ceil(T/nIntervals * (v-1) * (1-overLap/100))+1;
 			t3F = min(ceil(T/nIntervals * v * (1-overLap/100)),(double)T);
@@ -3037,7 +3028,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			t1S = ceil(sizeInterval+p*(v-1)+1);
 			t1F = min(ceil(sizeInterval+p*v),(double)T); 
 
-            //~ cout << "Printing until time " << t2S-1 << endl;
+            //~ //~ cout << "Printing until time " << t2S-1 << endl;
             //~ model.printSolution(env, inst, t2S-1);
 
 			model.modifyModel(env, inst, nIntervals, t3S, t3F, t2S, t2F, t1S, t1F);
@@ -3045,7 +3036,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
             
             #ifndef FixedGAP
             double newGap = max(0.001, (gapFirst - gapFirst/maxIt*v)/100);
-            cout << "New GAP " << newGap*100 << " % \n \n";
+            //~ cout << "New GAP " << newGap*100 << " % \n \n";
             model.cplex.setParam(IloCplex::EpGap, newGap);            
             #endif
 		}
@@ -3060,12 +3051,12 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
         
 		obj1stPhase = model.cplex.getObjValue();
 		double incumbent = obj1stPhase;
-		cout << "Solution Status " << model.cplex.getStatus() << " Value: " << obj1stPhase << endl;
+		//~ cout << "Solution Status " << model.cplex.getStatus() << " Value: " << obj1stPhase << endl;
 		
      
         #ifndef NImprovementPhase
-		cout << "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
-        cout << "Fix all solution \n";
+		//~ cout << "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
+        //~ cout << "Fix all solution \n";
         model.fixAllSolution(env, inst);
 		
         double tLimit=0;
@@ -3074,15 +3065,12 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
         timeLimit/3, elapsed_time, incumbent);
         
         tLimit = (timeLimit - elapsed_time/1000)/2;        
-        cout << "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;        
+        //~ cout << "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;        
 		
-
-        //~ tLimit = (timeLimit - elapsed_time/1000);
-        //~ cout << "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;
-        //~ model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        //~ tLimit, elapsed_time, incumbent);
+        model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+        tLimit, elapsed_time, incumbent);
         
-        //~ model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
+        model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
         
 		//~ model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, timeLimit, elapsed_time, incumbent);
 		
@@ -3120,7 +3108,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		}
 		#endif
 		
-		model.printSolution(env, inst, T);
+		//~ model.printSolution(env, inst, T);
 		
 		#ifndef NBetas
 		cout << "Total betas = " << totalBeta << endl;
@@ -3132,9 +3120,9 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		cout << "First phase -> n : " << nIntervals << " GAP: " << gapFirst << "; Overlap: " << overLap << "%; |EndBlock| " << endBlock << "; Time per block " << timePerIterFirst
 		<< "Second phase -> m: " << mIntervals << "; GAP " << gapSecond << "; Time per local search " << timePerIterSecond << endl;
 		// Header
-        cout << "1st phase time\t " << "1st phase obj: \t\t" << "2nd phase time\t " << "2nd phase obj: \t\t" << "CPLEX time\t " << "Other times \t" << "Improvement from 1st to 2nd phase \t" << endl;
+        cout << "Instance \t\t 1st phase time\t " << "1st phase obj: \t\t" << "2nd phase time\t " << "2nd phase obj: \t\t" << "CPLEX time\t " << "Other times \t" << "Improvement from 1st to 2nd phase \t" << endl;
         // Data
-        cout << time1stPhase/1000 << "\t" << obj1stPhase << "\t\t" << time2ndPhase/1000 << "\t" << obj2ndPhase << "\t\t" << opt_time/1000 << "\t" << (global_time-opt_time)/1000 << "\t" << abs((obj2ndPhase/obj1stPhase - 1)*100) << endl;
+        cout << file << "\t\t" << time1stPhase/1000 << "\t" << obj1stPhase << "\t\t" << time2ndPhase/1000 << "\t" << obj2ndPhase << "\t\t" << opt_time/1000 << "\t" << (global_time-opt_time)/1000 << "\t" << abs((obj2ndPhase/obj1stPhase - 1)*100) << endl;
         //~ << "CPLEX time: " << opt_time/1000 << endl << "Other times: " << (global_time-opt_time)/1000 << endl
 		//~ << "Total time: " << global_time/1000 << endl
 		//~ << "1st phase time: " << time1stPhase/1000 << endl
