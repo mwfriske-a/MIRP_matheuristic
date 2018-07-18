@@ -466,10 +466,10 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		for(t=1;t<=tOEB;t++){			
 			expr1 += inst.p_jt[j-1][t-1]*alpha[j][t];									//4rd term
             #ifndef NBetas
-            expr1 += 100*beta[j][t]; //100 may be enough
+            expr1 += 500*beta[j][t]; //100 may be enough
             #endif
             #ifndef NThetas
-            expr1 += 100*theta[j][t];
+            expr1 += 500*theta[j][t];
             #endif
 		}
 	}
@@ -1808,10 +1808,10 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 								//Obj
 								expr_obj_cost += inst.p_jt[i-1][t-1]*alpha[i][t];								//4rd term
 								#ifndef NBetas
-								expr_obj_cost += 1000*beta[i][t];										//Auxiliary variables
+								expr_obj_cost += 500*beta[i][t];										//Auxiliary variables
 								#endif
                                 #ifndef NThetas
-                                expr_obj_cost += 1000*theta[i][t];										//Auxiliary variables
+                                expr_obj_cost += 500*theta[i][t];										//Auxiliary variables
 								#endif
                                 
                                 #ifndef NWWCCReformulation
