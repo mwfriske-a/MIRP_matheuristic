@@ -2910,13 +2910,15 @@ const double& timeLimit, float& elapsed_time){
 	double prevObj;
 	vector <tuple<unsigned int,unsigned int, unsigned int> > vesselsComb;    // <id, v1, v2>
     vector <pair<unsigned int, float> > vesselsCombTimeCoef;                 //<id, coef>
+    vector <unsigned int> vesselsCombStopCause;                             //<cause> id is the index,  cause = 0 if stopped by GAP, 1 if stopped by time
 
-    //Building vector of coeficients
+    //Building vector of coeficients/stopcause
     sumC = 0;
     for(v=0;v<V-1;v++){
         for(v1=v+1;v1<V;v1++){
             vesselsCombTimeCoef.push_back(make_pair(sumC,1));
             sumC++;
+            vesselsCombStopCause.push_back(1); //Initially all are assumed to stopped by time
         }
     }
 	while ((previousObj - currentObj > 0.0001) && 
@@ -2937,30 +2939,42 @@ const double& timeLimit, float& elapsed_time){
             v1 = get<1>(vesselsComb[rId]);
 			v2 = get<2>(vesselsComb[rId]);
 			vesselsComb.erase(vesselsComb.begin()+rId);
-			//~ cout << "Improving vessels " << v1 << " and " << v2 << " Coef " << vesselsCombTimeCoef[combId].second << endl;
-			unFixVessel(inst,v1);
-			unFixVessel(inst,v2);
-            
-			cplex.setParam(IloCplex::TiLim, min(max(0.0,timePerIter*vesselsCombTimeCoef[combId].second), max(timeLimit-elapsed_local_time/1000,0.0)));
-			timer_cplex.start();
-			cplex.solve();
-			opt_time += timer_cplex.total();
-			prevObj = incumbent;
-			incumbent = cplex.getObjValue();
-			if(prevObj - incumbent > 0.0001){
-                count = 0;
-                vesselsCombTimeCoef[combId].second = vesselsCombTimeCoef[combId].second*(1+coef); //Increase the time coeficient
-            }else{
-                count++;
-                vesselsCombTimeCoef[combId].second = vesselsCombTimeCoef[combId].second*(1-coef); //Decrease the time coeficient
+			
+            if(vesselsCombStopCause[combId]==1){ // If the stop cause was time
+                cout << "Improving vessels " << v1 << " and " << v2 << " Coef " << vesselsCombTimeCoef[combId].second << endl;
+                unFixVessel(inst,v1);
+                unFixVessel(inst,v2);
+                
+                cplex.setParam(IloCplex::TiLim, min(max(0.0,timePerIter*vesselsCombTimeCoef[combId].second), max(timeLimit-elapsed_local_time/1000,0.0)));
+                timer_cplex.start();
+                cplex.solve();
+                if(cplex.getStatus()==IloAlgorithm::Optimal){ //Stopped by GAP
+                    vesselsCombStopCause[combId]=0;                    
+                }else{                                        //Stopped by time    
+                    vesselsCombStopCause[combId]=1;
+                    vesselsCombTimeCoef[combId].second = vesselsCombTimeCoef[combId].second*(1+coef); //Increase the time coeficient
+                    
+                }
+                opt_time += timer_cplex.total();
+                prevObj = incumbent;
+                incumbent = cplex.getObjValue();
+                //Deprecated - increase the time for improvements and decrease if no improvement is reached
+                //~ if(prevObj - incumbent > 0.0001){
+                    //~ count = 0;
+                    //~ vesselsCombTimeCoef[combId].second = vesselsCombTimeCoef[combId].second*(1+coef); //Increase the time coeficient
+                //~ }else{
+                    //~ count++;
+                    //~ vesselsCombTimeCoef[combId].second = vesselsCombTimeCoef[combId].second*(1-coef); //Decrease the time coeficient
+                //~ }
+                
+                //~ cout << "Objective " << incumbent << endl;
+                fixVesselPair(env, inst, v1,v2); //Fix the 2 vessels
+                elapsed_local_time += timer_LS.total();
+                if(elapsed_local_time/1000 >= timeLimit){
+                    break;
+                }
+                timer_LS.start();
             }
-			//~ cout << "Objective " << incumbent << endl;
-			fixVesselPair(env, inst, v1,v2); //Fix the 2 vessels
-			elapsed_local_time += timer_LS.total();
-			if(elapsed_local_time/1000 >= timeLimit){
-				break;
-			}
-			timer_LS.start();
 		}
         //~ cout << endl;
 		previousObj = currentObj;
@@ -3061,14 +3075,14 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		
         double tLimit=0;
         
-        model.improvementPhase_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        timeLimit/3, elapsed_time, incumbent);
+        //~ model.improvementPhase_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+        //~ timeLimit/3, elapsed_time, incumbent);
         
         tLimit = (timeLimit - elapsed_time/1000)/2;        
         //~ cout << "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;        
 		
-        model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        tLimit, elapsed_time, incumbent);
+        //~ model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+        //~ tLimit, elapsed_time, incumbent);
         
         model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
         
