@@ -204,5 +204,6 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		
 		void improvementPhase_typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<std::chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);
 		void warmStart(IloEnv env, Instance inst, const double& timePerIter);
+		void addInventoryConstraints(Instance inst, IloEnv& env, bool& feasible);
 	};
 }

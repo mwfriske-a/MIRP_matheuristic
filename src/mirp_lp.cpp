@@ -21,9 +21,9 @@
 //~ #define NTravelEmpty
 //~ #define NBerthLimit
 #define NBranching
-//~ #define NRelaxation
+#define NRelaxation
 #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
-#define NKnapsackInequalities
+//~ #define NKnapsackInequalities
 
 ILOSTLBEGIN
 
@@ -203,7 +203,8 @@ void Model::buildModel(IloEnv& env, Instance inst){
 			}else{
 				ss.str(string());
 				ss << "sP_(" << i << "," << t << ")";				
-				sP[i][t] = IloNumVar(env,inst.sMin_jt[i-1][0], inst.sMax_jt[i-1][0], ss.str().c_str()); //As the port capacity is fixed, always used the data from index 0
+				//~ sP[i][t] = IloNumVar(env,inst.sMin_jt[i-1][0], inst.sMax_jt[i-1][0], ss.str().c_str()); //As the port capacity is fixed, always used the data from index 0
+				sP[i][t] = IloNumVar(env,-IloInfinity, IloInfinity, ss.str().c_str()); //As the port capacity is fixed, always used the data from index 0
 				#ifndef NSpotMarket
 				ss.str(string());
 				ss << "alpha_(" << i << "," << t << ")";
@@ -872,16 +873,23 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 	for(i=1;i<=J;i++){
 		sPValue[i] = IloNumArray(env,T);
 		alphaValue[i] = IloNumArray(env,T);
+		cout << "Port inventory " << i << " S_0 " << inst.s_j0[i-1] << " D_i0 " << inst.d_jt[i-1][0] << " S^Max " << inst.sMax_jt[i-1][0] 
+         << " F^Min " << inst.f_min_jt[i-1][0] << " F^Max " << inst.f_max_jt[i-1][0] << " Max alpha " << inst.alp_max_j[i-1] 
+        << " Max alpha/t " << inst.alp_max_jt[i-1][0] << endl;
 		for(t=0;t<T;t++){
 			sPValue[i][t] = cplex.getValue(sP[i][t]);
+			cout << "(" << i << "," << t << "): " << sPValue[i][t];
 			if(t>0){
 				alphaValue[i][t] = cplex.getValue(alpha[i][t]);
-				if (alphaValue[i][t] >= 0.1)
+				if (alphaValue[i][t] >= 0.01){
 					costSpot += inst.p_jt[i-1][t-1];
-				//~ cout << "Port stock (" << i << "," << t << "): " << sPValue[i][t] << " Alpha: " << alphaValue[i][t] << endl;
+					cout << " Alpha: " << alphaValue[i][t];
+				}
 			}
-			//~ }else
-				//~ cout << "Port stock (" << i << "," << t << "): " << sPValue[i][t] << endl;
+			if(sPValue[i][t] > inst.f_max_jt[i-1][0] || sPValue[i][t] < inst.f_min_jt[i-1][0])
+				cout << " - Inventory out of bounds!";
+			cout << endl;
+				
 		}
 	}
 	
@@ -950,7 +958,7 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//~ cplex.setParam(IloCplex::MCFCuts, 2);		//Max 2
 	//~ cplex.setParam(IloCplex::ZeroHalfCuts, 2);	//Max 2
 	
-	cplex.setOut(env.getNullStream());
+	//~ cplex.setOut(env.getNullStream());
 	cplex.setWarning(env.getNullStream());
 	cplex.setParam(IloCplex::Threads, 1);
 	//~ cplex.setParam(IloCplex::ConflictDisplay, 2); 
@@ -977,6 +985,35 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	}	
 	#endif
 }
+/*
+ * After solved, verify which variables s_it were infeasible and add the corresponding constraint
+ */
+void Model::addInventoryConstraints(Instance inst, IloEnv& env, bool& feasible){
+	int J = inst.numTotalPorts;
+	int T = inst.t + 1;			//Init time-periods in 1
+	sPValue = IloArray<IloNumArray>(env,J+1);
+	unsigned int i,t;	
+	feasible = true;
+	//Getting the values
+	for (i=1;i<=J;i++){
+		sPValue[i] = IloNumArray(env,T);
+		for(t=0;t<T;t++){
+			sPValue[i][t] = cplex.getValue(sP[i][t]);			
+		}
+	}
+	//Adding constraints
+	for (i=1;i<=J;i++){		
+		for(t=0;t<T;t++){
+			if (sPValue[i][t] > inst.f_max_jt[i-1][0]){
+				sP[i][t].setUB(inst.f_max_jt[i-1][0]);
+				feasible = false;
+			}else if(sPValue[i][t] < inst.f_min_jt[i-1][0]){
+				sP[i][t].setLB(inst.f_min_jt[i-1][0]);			
+				feasible = false;
+			}
+		}
+	}
+}
 void mirp::milp(string file, const double& timeLimit, string optStr){
 	///Time parameters
 	Timer<chrono::milliseconds> timer_cplex;
@@ -1000,42 +1037,41 @@ void mirp::milp(string file, const double& timeLimit, string optStr){
 		Model model(env);
 		model.buildModel(env,inst); 		
 		model.setParameters(env, timeLimit);
-		
-		#ifndef NRelaxation
-		//Remove the integrality constraints
-		
-		#endif
+		bool feasible = false;
+		while(!feasible){
+			//Start optiization	
+			timer_cplex.start();
+			if(model.cplex.solve()){
+				global_time = timer_global.total();
+				opt_time = timer_cplex.total();
+				//~ cout << model.cplex.getNbinVars() << " \t & " << model.cplex.getNintVars() << " \t & " << model.cplex.getNcols() << " \t & " << model.cplex.getNrows() << " \t & "
+				//~ << opt_time/1000 << " \t & " << model.cplex.getObjValue() << " \t & " << model.cplex.getMIPRelativeGap()*100 
+				//~ <<"\% \t & " << model.cplex.getNiterations() << " \t & " << model.cplex.getNnodes() << " \t & " << endl;
+				//~ 
+				//~ model.cplex.setParam(IloCplex::IntSolLim, 2100000000); //Set number of solutions which must be found before stopping
+				//~ model.cplex.setParam(IloCplex::TiLim, timeLimit-opt_time/1000);
+				//~ 
+				//~ timer_cplex.start();
+				//~ timer_global.start();
+				//~ model.cplex.solve();
+				//~ global_time += timer_global.total();
+				//~ opt_time += timer_cplex.total();
+				//log << opt_time/1000 << " \t & " << model.cplex.getObjValue() << " \t & " << model.cplex.getMIPRelativeGap()*100 
+				//<<"\% \t & " << model.cplex.getNiterations() << " \t & " << model.cplex.getNnodes() << " \t & \\\\";
 
-		//Start optiization	
-		timer_cplex.start();
-		if(model.cplex.solve()){
-			global_time = timer_global.total();
-			opt_time = timer_cplex.total();
-			cout << model.cplex.getNbinVars() << " \t & " << model.cplex.getNintVars() << " \t & " << model.cplex.getNcols() << " \t & " << model.cplex.getNrows() << " \t & "
-			<< opt_time/1000 << " \t & " << model.cplex.getObjValue() << " \t & " << model.cplex.getMIPRelativeGap()*100 
-			<<"\% \t & " << model.cplex.getNiterations() << " \t & " << model.cplex.getNnodes() << " \t & " << endl;
-			//~ 
-			//~ model.cplex.setParam(IloCplex::IntSolLim, 2100000000); //Set number of solutions which must be found before stopping
-			//~ model.cplex.setParam(IloCplex::TiLim, timeLimit-opt_time/1000);
-			//~ 
-			//~ timer_cplex.start();
-			//~ timer_global.start();
-			//~ model.cplex.solve();
-			//~ global_time += timer_global.total();
-			//~ opt_time += timer_cplex.total();
-			//log << opt_time/1000 << " \t & " << model.cplex.getObjValue() << " \t & " << model.cplex.getMIPRelativeGap()*100 
-			//<<"\% \t & " << model.cplex.getNiterations() << " \t & " << model.cplex.getNnodes() << " \t & \\\\";
-					
-			//Verify the solution
-			
-		}else{		
-			cout << model.cplex.getStatus() << endl;		
-			global_time = timer_global.total();
-			opt_time = timer_cplex.total();
-			cout << model.cplex.getNbinVars() << " \t & " << model.cplex.getNintVars() << " \t & " << model.cplex.getNcols() << " \t & " << model.cplex.getNrows() << " \t & "
-			<< "\t & \t & \t & \t & \t & \t" <<  opt_time << " & \t & \t & " << model.cplex.getNiterations() << " \t & " << model.cplex.getNnodes() << " \\\\";		
+			}else{		
+				cout << model.cplex.getStatus() << endl;		
+				global_time = timer_global.total();
+				opt_time = timer_cplex.total();
+				cout << model.cplex.getNbinVars() << " \t & " << model.cplex.getNintVars() << " \t & " << model.cplex.getNcols() << " \t & " << model.cplex.getNrows() << " \t & "
+				<< "\t & \t & \t & \t & \t & \t" <<  opt_time << " & \t & \t & " << model.cplex.getNiterations() << " \t & " << model.cplex.getNnodes() << " \\\\";		
+			}
+			//Verify the solution - port inventory bounds 
+			cout << "Verifying inventory violations \n ";
+			model.addInventoryConstraints(inst, env, feasible);
 		}
-		//~ model.printSolution(env, inst);
+		
+		model.printSolution(env, inst,0);
 	}catch (IloException& e) {
 	cerr << "Concert exception caught: " << e << endl;		
 	e.end();
