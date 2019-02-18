@@ -11,16 +11,20 @@
 #define NBranching
 //~ #define NBetas  //Negative of alpha
 //~ #define NThetas //Plus of alpha
-//~ #define WaitAfterOperate		//If defined, allows a vessel to wait after operated at a port.
+#define WaitAfterOperate		//If defined, allows a vessel to wait after operated at a port.
 //~ #define NKnapsackInequalities
+#define NRelaxation				// Relax all intervals (end block should be 0) for obtaing the lower bound
 #define NWWCCReformulation
 #define NStartUPValidInequalities
 //~ #define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 #define NFixSinkArc         
-#define NOperateAndDepart
+//~ #define NOperateAndDepart
 #define NModifiedFlow
 //~ #define FixedGAP
-//~ #define NImprovementPhase
+#define NImprovementPhase
+
+//~ #define NProportionalCummulativeAlpha 	//If not defined, avoids usign all available alpha before ommiting part of the model
+//~ #define NThightPortInventory	//Thigths the inventory constraints of the ports in the last time period when part of the model is ommited
 
 
 ILOSTLBEGIN
@@ -184,8 +188,13 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					stringstream ss;
 					ss << "x_"<< v <<","<< j <<","<< i <<","<<t;
 					x[v][j][i][t].setName(ss.str().c_str());
+					#ifndef NRelaxation
+					convertX[v][j][i][t] = IloConversion(env, x[v][j][i][t], ILOFLOAT);
+					model.add(convertX[v][j][i][t]);
+					#endif
 					ss.str(string());
                     if(j > 0 && j <= J){ //If j is a port
+                        #ifdef NRelaxation
                         if (i > 0 && i <= J){ //If i is a port
                             if(t + inst.travelTime[v][j-1][i-1] > timePerIntervalId){ 	//If the arrive time is out of first interval, relax it                                
                                 convertX[v][j][i][t] = IloConversion(env, x[v][j][i][t], ILOFLOAT);
@@ -197,6 +206,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                                 model.add(convertX[v][j][i][t]);
                             }
                         }
+                        #endif                      
                     }
 					ss << "fX_"<<v<<","<<j<<","<<i<<","<<t;
 					fX[v][j][i][t] = IloNumVar(env, 0, inst.q_v[v], ss.str().c_str());                    
@@ -249,18 +259,32 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					ss.str(string());
 					ss << "z_(" << j << "," << t << ")," << v;
 					z[v][j][t].setName(ss.str().c_str());
+                    #ifdef NRelaxation
                     if(t > timePerIntervalId){
                         convertZ[v][j][t] = IloConversion(env, z[v][j][t], ILOFLOAT);
                         model.add(convertZ[v][j][t]);
                     }
+                    #endif
+                    #ifndef NRelaxation
+					convertZ[v][j][t] = IloConversion(env, z[v][j][t], ILOFLOAT);
+					model.add(convertZ[v][j][t]);
+                    #endif
+                
+                    
 					#ifndef WaitAfterOperate
 					ss.str(string());
 					ss << "oA_(" << j << "," << t << ")," << v;
 					oA[v][j][t].setName(ss.str().c_str());
+                    #ifdef NRelaxation
                     if(t > timePerIntervalId){
                         convertOA[v][j][t] = IloConversion(env, oA[v][j][t], ILOFLOAT);
                         model.add(convertOA[v][j][t]);
                     }
+                    #endif
+                    #ifndef NRelaxation
+                    convertOA[v][j][t] = IloConversion(env, oA[v][j][t], ILOFLOAT);
+					model.add(convertOA[v][j][t]);
+                    #endif
 					#endif
 					if(t<T-1){ //Variables that haven't last time index
 						ss.str(string());
@@ -271,11 +295,17 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                         ss.str(string());
 						ss << "w_(" << j << "," << t << ")," << v;
 						w[v][j][t].setName(ss.str().c_str());
+                        #ifdef NRelaxation
                         if(t >= timePerIntervalId){       //Note the use of >= when considering 'horizontal' transition arcs
                             convertW[v][j][t] = IloConversion(env, w[v][j][t], ILOFLOAT);
                             model.add(convertW[v][j][t]);
                         }
-
+						#endif
+						#ifndef NRelaxation
+						convertW[v][j][t] = IloConversion(env, w[v][j][t], ILOFLOAT);
+						model.add(convertW[v][j][t]);
+						#endif
+						
 						#ifndef WaitAfterOperate
                         ss.str(string());
 						ss << "fOB_(" << j << "," << t << ")," << v;
@@ -285,20 +315,32 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 						ss.str(string());
 						ss << "oB_(" << j << "," << t << ")," << v;
 						oB[v][j][t].setName(ss.str().c_str());
+                        #ifdef NRelaxation
                         if(t >= timePerIntervalId){
                             convertOB[v][j][t] = IloConversion(env, oB[v][j][t], ILOFLOAT);
                             model.add(convertOB[v][j][t]);
                         }
+                        #endif
+                        #ifndef NRelaxation
+                        convertOB[v][j][t] = IloConversion(env, oB[v][j][t], ILOFLOAT);
+						model.add(convertOB[v][j][t]);
+						#endif
 						#endif
 						
 						#ifdef WaitAfterOperate
                         ss.str(string());
                         ss << "wB_(" << j << "," << t << ")," << v;
                         wB[v][j][t].setName(ss.str().c_str());
+                        #ifdef NRelaxation
                         if(t >= timePerIntervalId){
                             convertWB[v][j][t] = IloConversion(env, wB[v][j][t], ILOFLOAT);
                             model.add(convertWB[v][j][t]);
                         }
+                        #endif                        
+                        #ifndef NRelaxation
+                        convertWB[v][j][t] = IloConversion(env, wB[v][j][t], ILOFLOAT);
+						model.add(convertWB[v][j][t]);
+						#endif
                         ss.str(string());
                         ss << "fWB_(" << j << "," << t << ")," << v;
                         fWB[v][j][t] = IloNumVar(env, 0, IloInfinity, ss.str().c_str());
@@ -377,14 +419,15 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		for (t=inst.firstTimeAv[v]+1;t<T;t++){		//and initial time available t
 			for(j=1;j<N-1;j++){						//Not necessary to account sink node
 				#ifdef NSimplifyModel
-				if (i != j){
+				if (i != j)
 				#endif
 				#ifndef NSimplifyModel
 				//~ if (i != j && (inst.typePort[i-1] != inst.typePort[j-1] || inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v]) ){
                 if (inst.typePort[i-1] != inst.typePort[j-1] || 	//If ports are of different types
 					(i != j && ((inst.typePort[i-1] == inst.typePort[j-1] && inst.idRegion[i-1] == inst.idRegion[j-1]) //or if i and j are different, of the same type and of the same region
-                    || (inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v])))){     //or if the sum of the minimum amount is greater than the vessel capacity
+                    || (inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v]))))     //or if the sum of the minimum amount is greater than the vessel capacity
 				#endif
+				{
 					int t2 = t + inst.travelTime[v][i-1][j-1]; 
 					if (t2<T){ 	//If exists time to reach port j 
 						double arc_cost;
@@ -421,10 +464,16 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 						}
 						//Create arc from j,t2 to others ports (j2) in time t3
 						for(int j2=1;j2<=J;j2++){
-							//~ if(j2 != i && j2 != j){
+							#ifdef NSimplifyModel
+							if(j2 != i && j2 != j)
+							#endif
+							#ifndef NSimplifyModel
 							if(j2 != i && j2 != j	//If it is a third port
 							 && (inst.typePort[j-1] != inst.typePort[j2-1] || //if the types are different, or...
-							 (inst.typePort[j-1] == inst.typePort[j2-1] && inst.idRegion[j-1] == inst.idRegion[j2-1]))){ //the types are equal and of the same region
+							 (inst.typePort[j-1] == inst.typePort[j2-1] && inst.idRegion[j-1] == inst.idRegion[j2-1] ||
+							 (inst.f_min_jt[j-1][0] + inst.f_min_jt[j2-1][0] <= inst.q_v[v])))) //the types are equal and of the same region
+							#endif
+							{
 								int t3 = t2+inst.travelTime[v][j-1][j2-1];  
 								if(t3<T){
 									if (inst.typePort[j-1]==1 && inst.typePort[j2-1]==0){
@@ -616,7 +665,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				//~ //~ cout << it << " [" << l << "," << k << "]\n";
             for(v=0;v<V;v++){
 				#ifdef WaitAfterOperate
-				expr_kP1_LHS += wB[v][i][k];
+				if(k<tOEB){
+					expr_kP1_LHS += wB[v][i][k];
+				}
 				if(l>1 && hasEnteringArc1st[v][i][l-1]==1)
 					expr_kD1_LHS += w[v][i][l-1] + wB[v][i][l-1];
 				#endif
@@ -744,7 +795,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
         }
         #endif
         #endif
-		
+		float thighetInventoryValue = 0;
 		for(t=1;t<=tOEB;t++){
 			expr_berth.clear();
 			expr_invBalancePort.clear();
@@ -785,6 +836,12 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
 				inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
 			model.add(portInventory[i][t]);
+			#ifndef NThightPortInventory
+			if(t>tOEB-nIntervals){
+				thighetInventoryValue += inst.d_jt[i-1][t-1];
+			}
+			#endif
+			
             #ifndef NWWCCReformulation            
             stringstream ss3;
             //Common for both loading and discharging ports
@@ -831,8 +888,21 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
             #endif
 		}
 		ss1 << "cum_slack("<<i<<")";
+		#ifdef NProportionalCummulativeAlpha
 		cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
-		model.add(cumSlack[i]);   
+		#endif
+		#ifndef NProportionalCummulativeAlpha
+		cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1]/(T-1)*tOEB, ss1.str().c_str());
+		#endif
+		model.add(cumSlack[i]);  
+		
+		#ifndef NThightPortInventory
+		if(inst.delta[i-1] == 1){
+			sP[i][tOEB-1].setUB(inst.sMax_jt[i-1][0]-thighetInventoryValue);
+		}else{
+			sP[i][tOEB-1].setLB(inst.sMin_jt[i-1][0]+thighetInventoryValue);
+		}
+		#endif  
         
              
 	}
@@ -1005,7 +1075,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                                     expr_2ndLevel += x[v][i][j][t];
                                     expr_2ndFlow += fX[v][i][j][t];
                                     #ifndef NOperateAndDepart
-                                    if (inst.q_v[v] <= inst.f_max_jt[i-1][t-1]){ //Only if a vessel can load(unload) in the port in just 1 time period
+                                    if (inst.q_v[v] <= inst.f_max_jt[i-1][0]){ //Only if a vessel can load(unload) in the port in just 1 time period
                                         expr_opd += x[v][i][j][t];
                                     }
                                     #endif
@@ -1013,7 +1083,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                                     expr_2ndLevel += x[v][i][j][t];
                                     expr_2ndFlow += fX[v][i][j][t];
                                     #ifndef NOperateAndDepart
-                                    if (inst.q_v[v] <= inst.f_max_jt[i-1][t-1] && inst.typePort[i-1] != inst.typePort[j-1]){ //Only if a vessel can load(unload) in the port in just 1 time period and i and j are ports of different types
+                                    if (inst.q_v[v] <= inst.f_max_jt[i-1][0] && inst.typePort[i-1] != inst.typePort[j-1]){ //Only if a vessel can load(unload) in the port in just 1 time period and i and j are ports of different types
                                         expr_opd += x[v][i][j][t];
                                     }
                                     #endif
@@ -1471,16 +1541,16 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
     int N = J + 1;    	
 	//First gets the solution values for fixing (when needed)
 	if (tS_fix < T){		
-		//~ cout << "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
+		cout << "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
 		getSolValsW(env, inst, tS_fix, tF_fix, false);	//Get only values of the interval for fixing
 	}
 	
-	//~ if (tS_int <= T)
-		//~ cout << "Integralizing: [" << tS_int << "," << tF_int << "]\n";
+	if (tS_int <= T)
+		cout << "Integralizing: [" << tS_int << "," << tF_int << "]\n";
 	
 	///Removing end-block
-	//~ if(tS_add <= T)
-		//~ cout << "Adding to the model [" << tS_add << "," << tF_add << "]\n";
+	if(tS_add <= T)
+		cout << "Adding to the model [" << tS_add << "," << tF_add << "]\n";
 		
     ///Objective function	
 	IloExpr expr_obj_current = cplex.getObjective().getExpr(); //Gets the current objective function
@@ -1768,7 +1838,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 					t0 = max(1,tS_fix-(int)inst.travelTime[v][i-1][j-1]);
 				else
 					t0 = tS_fix;
-				
+				float thighetInventoryValue = 0;
 				for(t=t0;t<=tF_add;t++){
 					///Port-time iterator (i,t)
 					if(v==0 && j==1){
@@ -1805,6 +1875,12 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 									sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
 									inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
 								model.add(portInventory[i][t]);
+								
+								#ifndef NThightPortInventory
+								if(tF_add < T && t > tF_add-nIntervals){ //Does not thight the last time period of the original horizon
+									thighetInventoryValue += inst.d_jt[i-1][t-1];
+								}
+								#endif
 								//Obj
 								expr_obj_cost += inst.p_jt[i-1][t-1]*alpha[i][t];								//4rd term
 								#ifndef NBetas
@@ -1958,6 +2034,18 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 						}
 					}
 				}
+				#ifndef NThightPortInventory
+				if(v==0 && j == 1 && tS_add <= T){
+					//Update the previous thighted inventory and thight the new last interval
+					if(inst.delta[i-1]==1){
+						sP[i][tS_add-1].setUB(inst.sMax_jt[i-1][0]);
+						sP[i][tF_add].setUB(inst.sMax_jt[i-1][0]-thighetInventoryValue);
+					}else{
+						sP[i][tS_add-1].setLB(inst.sMin_jt[i-1][0]);
+						sP[i][tF_add].setLB(inst.sMin_jt[i-1][0]+thighetInventoryValue);
+					}
+				}
+				#endif
 			}
 			///Need another time iterator (v,i,t) - only for decrease endBlock
 			if(tS_add <= T){
@@ -1971,7 +2059,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 						expr_2ndLevel = secondLevelBalance[v][i][t].getExpr();
 						expr_2ndFlow = secondLevelFlow[v][i][t].getExpr();
 						#ifndef NOperateAndDepart
-						if(hasEnteringArc1st[v][i][t]==1 && inst.q_v[v] <= inst.f_max_jt[i-1][t-1]){
+						if(hasEnteringArc1st[v][i][t]==1 && inst.q_v[v] <= inst.f_max_jt[i-1][0]){
 							expr_opd.clear();
 							expr_opd = operateAndDepart[v][i][t].getExpr();
 						}
@@ -1982,7 +2070,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 									expr_2ndLevel += x[v][i][j1][t];
 									expr_2ndFlow += fX[v][i][j1][t];
 									#ifndef NOperateAndDepart
-									if (inst.q_v[v] <= inst.f_max_jt[i-1][t-1] && inst.typePort[i-1] != inst.typePort[j1-1])
+									if (inst.q_v[v] <= inst.f_max_jt[i-1][0] && inst.typePort[i-1] != inst.typePort[j1-1])
 										expr_opd += x[v][i][j1][t];
 									#endif
 								}
@@ -1992,7 +2080,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 						secondLevelBalance[v][i][t].setExpr(expr_2ndLevel);
 						secondLevelFlow[v][i][t].setExpr(expr_2ndFlow);
 						#ifndef NOperateAndDepart
-						if (hasEnteringArc1st[v][i][t]==1 && inst.q_v[v] <= inst.f_max_jt[i-1][t-1]){							
+						if (hasEnteringArc1st[v][i][t]==1 && inst.q_v[v] <= inst.f_max_jt[i-1][0]){							
 							operateAndDepart[v][i][t].setExpr(expr_opd);							
 						}
 						#endif
@@ -2032,14 +2120,14 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 										expr_2ndLevel += x[v][i][j1][t];
 										expr_2ndFlow += fX[v][i][j1][t];
 										#ifndef NOperateAndDepart
-										if (inst.q_v[v] <= inst.f_max_jt[i-1][t-1])
+										if (inst.q_v[v] <= inst.f_max_jt[i-1][0])
 											expr_opd += x[v][i][j1][t];
 										#endif
 									}else if (t + inst.travelTime[v][i-1][j1-1] <= tF_add){ //If j1 is a port, it is necessary that the arrival is in the model
 										expr_2ndLevel += x[v][i][j1][t];
 										expr_2ndFlow += fX[v][i][j1][t];
 										#ifndef NOperateAndDepart
-										if(inst.q_v[v] <= inst.f_max_jt[i-1][t-1] && inst.typePort[i-1] != inst.typePort[j1-1])
+										if(inst.q_v[v] <= inst.f_max_jt[i-1][0] && inst.typePort[i-1] != inst.typePort[j1-1])
 											expr_opd += x[v][i][j1][t];
 										#endif
 									}
@@ -2048,7 +2136,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 						}
 						#ifndef NOperateAndDepart
 						ss11 << "operate_and_depart_" << v << "(" << i << "," << t << ")";
-                        if(hasEnteringArc1st[v][i][t]==1 && inst.q_v[v] <= inst.f_max_jt[i-1][t-1]){
+                        if(hasEnteringArc1st[v][i][t]==1 && inst.q_v[v] <= inst.f_max_jt[i-1][0]){
 							#ifdef WaitAfterOperate                        
 								expr_opd += -z[v][i][t];
 							#endif
@@ -2261,8 +2349,12 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
                         #endif
 					}
 				}
-				if(v==0)
+				if(v==0){
 					cumSlack[i].setExpr(expr_cumSlack);
+					#ifndef NProportionalCummulativeAlpha
+					cumSlack[i].setUB(inst.alp_max_j[i-1]/T*tF_add);
+					#endif
+				}
                 #ifndef NBranching
                 //~ priorityX[v][i].setExpr(expr_sumEnteringX);
                 priorityOA[v][i].setExpr(expr_sumOA);
@@ -3018,12 +3110,13 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		Model model(env);
 		model.buildFixAndRelaxModel(env,inst, nIntervals, endBlock);
 		model.setParameters(env, timePerIterFirst, gapFirst);
-        //~ model.cplex.exportModel("mip_R&F.lp");
+        model.cplex.exportModel("mip_R&F.lp");
 		//Relax-and-fix
 		double p = T/nIntervals*(1-overLap/100); // Units of t that are add at each iteration to the model.
 		int s = T-(T/nIntervals*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
 		int sizeInterval = T/nIntervals;		 // Last t of integer block (always starting with 1 integer interval)
         int maxIt = ceil((T-sizeInterval)/p);        
+        #ifdef NRelaxation
         for (v=1; v <= maxIt; v++){
 			timer_cplex.start();
 			//~ cout << "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
@@ -3042,7 +3135,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			t1S = ceil(sizeInterval+p*(v-1)+1);
 			t1F = min(ceil(sizeInterval+p*v),(double)T); 
 
-            //~ //~ cout << "Printing until time " << t2S-1 << endl;
+            //~ cout << "Printing until time " << t2S-1 << endl;
             //~ model.printSolution(env, inst, t2S-1);
 
 			model.modifyModel(env, inst, nIntervals, t3S, t3F, t2S, t2F, t1S, t1F);
@@ -3054,6 +3147,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
             model.cplex.setParam(IloCplex::EpGap, newGap);            
             #endif
 		}
+		#endif
 		
 		//Last iteration (after fixing the penultimate interval)
 		timer_cplex.start();

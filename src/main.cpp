@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "../include/util.h"
 #include "../include/model.h"
-//~ #define NTestInstanceSet
+#define NTestInstanceSet
 using namespace std;
 
 int main(const int argc, char** argv) {
@@ -117,8 +117,16 @@ while ((opt = getopt(argc,argv,"v:p:f:t:y:s:n:g:o:e:r:l:m:i:h:u:")) != EOF)
 
  switch (modelId){
 	case 1: 
+		#ifdef NTestInstanceSet
 		mirp::milp(file.str(), timeLimit, optstr);
 		break;
+		#endif
+		#ifndef NTestInstanceSet
+        for(int i=0;i<instances.size();i++){
+			mirp::milp(instances[i], timeLimit, optstr);
+		}
+		#endif
+				
 	case 2: 
 		if (endBlock + 2 > ceil(nIntervals)) {
 			cout << "Error! Size of end block must be at leat 2 units less than the number of intervals)" << endl;
