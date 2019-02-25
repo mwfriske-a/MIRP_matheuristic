@@ -945,7 +945,7 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 
 }
 void Model::setParameters(IloEnv& env, const double& timeLimit, const double& gap=1e-04){
-	cplex.exportModel("mip.lp");
+	//~ cplex.exportModel("mip.lp");
 	//~ env.setNormalizer(IloFalse);
 	//Pressolve
 	//~ cplex.setParam(IloCplex::PreInd,0);
@@ -965,8 +965,8 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//~ cplex.setParam(IloCplex::MCFCuts, 2);		//Max 2
 	//~ cplex.setParam(IloCplex::ZeroHalfCuts, 2);	//Max 2
 	
-	//~ cplex.setOut(env.getNullStream());
-	//~ cplex.setWarning(env.getNullStream());
+	cplex.setOut(env.getNullStream());
+	cplex.setWarning(env.getNullStream());
 	cplex.setParam(IloCplex::Threads, 1);
 	//~ cplex.setParam(IloCplex::ConflictDisplay, 2); 
 	//~ cplex.setParam(IloCplex::MIPDisplay, 1); 

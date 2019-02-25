@@ -131,6 +131,17 @@ while ((opt = getopt(argc,argv,"v:p:f:t:y:s:n:g:o:e:r:l:m:i:h:u:")) != EOF)
 		if (endBlock + 2 > ceil(nIntervals)) {
 			cout << "Error! Size of end block must be at leat 2 units less than the number of intervals)" << endl;
 		}
+		//Header
+		cout << "Instance\t"  <<
+				"Time(RF)\t"  <<
+				"Obj(RF)\t"   <<
+				"Time(FO)\t"  <<
+				"Obj(FO)\t"   << 
+				"CPX time\t"  << 
+				"Otr time \t" << 
+				"Impr \%\t"   << 
+				"Inf\t"		  <<
+				endl;
         #ifndef NTestInstanceSet
         for(int i=0;i<instances.size();i++){
             mirp::fixAndRelax(instances[i], optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit);
