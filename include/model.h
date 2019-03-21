@@ -182,6 +182,7 @@ const int& timePerIter, const double& mIntervals, const int& timePerIter2, const
 		void decreaseEndBlock (IloEnv& env, Instance inst, const double& nIntervals, const int& t2S, const int& t2F); //Add to the model FO and constranints the variables between t2S and t2F
 		void reIntegralize(IloEnv& env, Instance inst, const int& t1S, const int& t1F);
 		void improvementPhase_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent);
+		void improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent);
 		void unFixInterval(Instance inst, const int& tS, const int& tF);
 		void improvementPhase_vessels(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, double& obj1stPhase, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time);
 		void fixVessel(IloEnv env,Instance inst, const int& v);
