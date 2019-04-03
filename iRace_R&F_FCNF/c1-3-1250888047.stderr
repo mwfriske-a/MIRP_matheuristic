@@ -1,0 +1,19 @@
+../build/mirp.out: invalid option -- '-'
+usuage is 
+ -v : Version (1 - for MILP; 2- for fix-and-relax vertically; 3-fix-and-relax horizontally) 
+ -p : instance path 
+ -t : time limit in seconds - for -v = 2, corresponds to timelimit of local searches 
+ -s : A string to put together in the logFile name 
+For -v = {2,3} (Fix and relax algorithm):
+ -n : Number of intervals in the first phase (-v =2) 
+ -g : Initial GAP for solving the first phase (-v = 2,3) 
+-f : Number of intervals that leaves the end block in each iteration (-v =2) 
+ -o : percentage of overlapping between the fixed and the integer interval (-v =2) 
+ -e : Size of the end block/vessels out of model (must be at most n-2) 
+ -r : Vessels out of model (must be at most v-2) 
+ -l : Time limit for solving each interval 
+ -m : Number of intervals in the improvement phase (-v =2)
+ -i : Time limit for one loop in the improvement phase 
+ -h : Fixed GAP in the imnprovement phase 
+ -u : Overlap in the imnprovement phase 
+ 

@@ -1,0 +1,38 @@
+## This is an example of specifying instances with a file.
+
+# Each line is an instance relative to trainInstancesDir
+# (see scenario.txt.tmpl) and an optional sequence of instance-specific
+# parameters that will be passed to target-runnerx when invoked on that
+# instance.
+
+# Empty lines and comments are ignored.
+
+LR1_1_DR1_3_VC1_V7a/ 
+LR1_1_DR1_4_VC3_V11a/ 
+LR1_1_DR1_4_VC3_V12a/ 
+LR1_1_DR1_4_VC3_V12b/ 
+LR1_1_DR1_4_VC3_V8a/ 
+LR1_1_DR1_4_VC3_V9a/ 
+LR1_2_DR1_3_VC2_V6a/ 
+LR1_2_DR1_3_VC3_V8a/ 
+LR2_11_DR2_22_VC3_V6a/ 
+LR2_11_DR2_33_VC4_V11a/ 
+LR2_11_DR2_33_VC5_V12a/ 
+LR2_22_DR2_22_VC3_V10a/ 
+LR2_22_DR3_333_VC4_V14a/ 
+LR2_22_DR3_333_VC4_V17a/ 
+
+# t60/LR1_1_DR1_3_VC1_V7a/  
+# t60/LR1_1_DR1_4_VC3_V11a/ 
+# t60/LR1_1_DR1_4_VC3_V12a/ 
+# t60/LR1_1_DR1_4_VC3_V12b/ 
+# t60/LR1_1_DR1_4_VC3_V8a/ 
+# t60/LR1_1_DR1_4_VC3_V9a/ 
+# t60/LR1_2_DR1_3_VC2_V6a/ 
+# t60/LR1_2_DR1_3_VC3_V8a/ 
+# t60/LR2_11_DR2_22_VC3_V6a/ 
+# t60/LR2_11_DR2_33_VC4_V11a/ 
+# t60/LR2_11_DR2_33_VC5_V12a/ 
+# t60/LR2_22_DR2_22_VC3_V10a/ 
+# t60/LR2_22_DR3_333_VC4_V14a/ 
+# t60/LR2_22_DR3_333_VC4_V17a/ 
