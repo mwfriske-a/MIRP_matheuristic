@@ -40,7 +40,7 @@ stringstream file;
 string optstr;
 double timeLimit, gapFirst, gapSecond, overLap, mIntervals, nIntervals, overlap2;
 int opt, endBlock, outVessel, timePerIterFirst, timePerIterSecond, f ;
-bool validIneq, addConstr, thigthInvConstr, proportionalAlpha, instanceSimplify;
+bool validIneq, addConstr, tightenInvConstr, proportionalAlpha, preprocessing;
 vector <string> instances;
 instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_3_VC1_V7a/");
 instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_4_VC3_V11a/");
@@ -70,7 +70,7 @@ instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC5_V12a
 instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR2_22_VC3_V10a/");
 instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V14a/");
 instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V17a/");
-while ((opt = getopt(argc,argv,"v:p:t:s:n:g:f:o:e:r:l:m:i:h:u:")) != EOF)
+while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:n:g:f:o:e:r:l:m:i:h:u:")) != EOF)
 	switch(opt)
 	{
 		case 'v': 
@@ -86,19 +86,18 @@ while ((opt = getopt(argc,argv,"v:p:t:s:n:g:f:o:e:r:l:m:i:h:u:")) != EOF)
 			optstr = optarg;
 			break;
 		case 'q':
-			validIneq = optarg;
-			break;
+			validIneq = atoi(optarg);			
 		case 'c':
-			addConstr = optarg;
+			addConstr = atoi(optarg);
 			break;
 		case 'd':
-			thigthInvConstr = optarg;
+			tightenInvConstr = atoi(optarg);
 			break;
 		case 'k':
-			proportionalAlpha = optarg;
+			proportionalAlpha = atoi(optarg);
 			break;
 		case 'z':
-			instanceSimplify = optarg;
+			preprocessing = atoi(optarg);
 			break;
 		case 'n':
 			nIntervals = stod(optarg);
@@ -169,11 +168,15 @@ while ((opt = getopt(argc,argv,"v:p:t:s:n:g:f:o:e:r:l:m:i:h:u:")) != EOF)
 				//~ endl;
         #ifndef NTestInstanceSet
         for(int i=0;i<instances.size();i++){
-            mirp::fixAndRelax(instances[i], optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit);
+            mirp::fixAndRelax(instances[i], optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, 
+				mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit, validIneq, addConstr, tightenInvConstr,
+				proportionalAlpha, preprocessing);
         }
         #endif
         #ifdef NTestInstanceSet
-        mirp::fixAndRelax(file.str(), optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit);
+        mirp::fixAndRelax(file.str(), optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, 
+			mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit, validIneq, addConstr, tightenInvConstr,
+			proportionalAlpha, preprocessing);
         #endif
 		break;
 	case 3:
