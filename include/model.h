@@ -176,7 +176,7 @@ namespace mirp{
 			model.add(obj);		
 		};	
 		void buildModel(IloEnv& env, Instance inst); 
-		void buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nIntervals, const int& endBlock, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& preprocessing, const bool& tightenFlow); 
+		void buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nIntervals, const int& endBlock, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceArcs, const bool& tightenFlow); 
 		void setParameters(IloEnv& env, const double& timeLimit, const double& gap);
 		void fixSolution(IloEnv& env, Instance inst, const int& t3S, const int& t3F, const int& p, const bool& fixSinkArc);
 		void modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const int& tS_fix, const int& tF_fix, const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& tightenFlow);

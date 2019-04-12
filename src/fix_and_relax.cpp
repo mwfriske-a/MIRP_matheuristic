@@ -45,12 +45,12 @@ using mirp::Instance;
  * - addConstr: Forces a vessel with Q_v < F^Max_it to operante once and depart from i
  * - tightenInvConstr: Tights the inventory constraints of the ports in the last time period when part of the model is ommited
  * - proportionalAlpha: Forbid usign all available alpha before ommiting part of the model
- * - preprocessing: Does not consider the arcs between port of same type and different regions, or ports i,j of the same region with F^Min_i+F^Min_j > Q_v
+ * - reduceArcs: Does not consider the arcs between port of same type and different regions, or ports i,j of the same region with F^Min_i+F^Min_j > Q_v
  * - tightenFlow: For flow variables fWB(fOB) - for DP change the upper bound, for LP create a lower bound
  */
 void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nIntervals, const int& endBlock, 
 		const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha,
-		const bool& preprocessing, const bool& tightenFlow){	
+		const bool& reduceArcs, const bool& tightenFlow){	
 	int i, j,t,v,a;
 	int timePerIntervalId = inst.t/nIntervals; //Number of time periods in each interval
 	int J = inst.numTotalPorts;
@@ -423,12 +423,17 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		i = inst.initialPort[v]+1;					//Arcs from initial port i
 		for (t=inst.firstTimeAv[v]+1;t<T;t++){		//and initial time available t
 			for(j=1;j<N-1;j++){						//Not necessary to account sink node
-				if( !preprocessing && i != j ||		//No preprocessing
-					preprocessing &&  		//With preprocessing
-					(inst.typePort[i-1] != inst.typePort[j-1] || 	//If ports are of different types
-					(i != j && ((inst.idRegion[i-1] == inst.idRegion[j-1]) //or if i and j are different, of the same region (and consequently of the same type)
-                    && (inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v]))))     //and if the sum of the minimum amount is greater than the vessel capacity
-					){				
+				bool addArcIJ = false;
+				if(i != j && 
+					((inst.delta[i-1] == inst.delta[j-1] && //if i and j are of the same type 
+                    inst.f_min_jt[i-1][t-1] + inst.f_min_jt[j-1][t-1] <= inst.q_v[v]) || // and min operation sum is lesser than capacity op vessel
+					inst.delta[i-1] != inst.delta[j-1])){ //or ports are of different types
+						addArcIJ = true;
+					}
+				if(reduceArcs && inst.delta[i-1] == inst.delta[j-1] && inst.idRegion[i-1] != inst.idRegion[j-1]){
+					addArcIJ = false;
+				}
+				if(addArcIJ){				
 					int t2 = t + inst.travelTime[v][i-1][j-1]; 
 					if (t2<T){ 	//If exists time to reach port j 
 						double arc_cost;
@@ -465,13 +470,19 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 						}
 						//Create arc from j,t2 to others ports (j2) in time t3
 						for(int j2=1;j2<=J;j2++){
-							if(!preprocessing && (j2 != i && j2 != j) || //No preprocessing
-								preprocessing && 		//Preprocessing
-								(j2 != i && j2 != j	//If it is a third port
-							 && (inst.typePort[j-1] != inst.typePort[j2-1] //if the types are different
-							 || (inst.idRegion[j-1] == inst.idRegion[j2-1] // or if they are of a same region
-							 && (inst.f_min_jt[j-1][0] + inst.f_min_jt[j2-1][0] <= inst.q_v[v])))) // and the sum of minimum operation at j and j2 is less or equal to the vessel capacity
-							){
+							bool addArcJJ2 = false;
+							if(j2 != i && j2 != j && 
+								((inst.delta[j-1] == inst.delta[j2-1] && //if j and j2 are of the same type 
+								inst.f_min_jt[j-1][0] + inst.f_min_jt[j2-1][0] <= inst.q_v[v]) || // and min operation sum is lesser than capacity op vessel
+								inst.delta[j-1] != inst.delta[j2-1])){ //or ports are of different types
+									addArcJJ2 = true;
+								}
+							if(reduceArcs && inst.delta[j-1] == inst.delta[j2-1] && inst.idRegion[j-1] != inst.idRegion[j2-1]){ //If they are of the same type but from different regions, no add the arc
+								addArcJJ2 = false;
+							}
+							
+							
+							if(addArcJJ2){
 								int t3 = t2+inst.travelTime[v][j-1][j2-1];  
 								if(t3<T){
 									if (inst.typePort[j-1]==1 && inst.typePort[j2-1]==0){
@@ -1285,26 +1296,28 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 							flowMinCapacityX[v][i][j] = IloRangeArray(env,T);
                         }
 						for(t=0;t<=tOEB;t++){
-							stringstream ss,ss1;
-							ss << "flowLimitX_" << v << "," << i << "," << j << "," << t;
-							ss1 << "flowMinLimitX_" << v << "," << i << "," << j << "," << t;
-							if(j == N-1){ //If j is sink node                            
-								flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss.str().c_str());
-								model.add(flowCapacityX[v][i][j][t]);
-							}else if (i>0 && t + inst.travelTime[v][i-1][j-1] <= tOEB){ //If x variable reach j in the time period
-								//Original flow upper limit
-                                flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss.str().c_str());
-                                model.add(flowCapacityX[v][i][j][t]);
-                                if(tightenFlow){ //Thighter upper bound if traveling between 2 loading ports
-									if(inst.typePort[i-1] == inst.typePort[j-1]){ //Only for cases where ports are of the same type
-										if (inst.typePort[i-1] == 0){   //Loading ports 
-											flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[j-1][0]));
-											flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[i-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
-										}else{
-											flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[i-1][0]));
-											flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[j-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
+							if(hasArc[v][i][j][t]==1){
+								stringstream ss,ss1;
+								ss << "flowLimitX_" << v << "," << i << "," << j << "," << t;
+								ss1 << "flowMinLimitX_" << v << "," << i << "," << j << "," << t;
+								if(j == N-1){ //If j is sink node                            
+									flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss.str().c_str());
+									model.add(flowCapacityX[v][i][j][t]);
+								}else if (i>0 && t + inst.travelTime[v][i-1][j-1] <= tOEB){ //If x variable reach j in the time period
+									//Original flow upper limit
+									flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss.str().c_str());
+									model.add(flowCapacityX[v][i][j][t]);
+									if(tightenFlow){ //Thighter upper bound if traveling between 2 loading ports
+										if(inst.typePort[i-1] == inst.typePort[j-1]){ //Only for cases where ports are of the same type
+											if (inst.typePort[i-1] == 0){   //Loading ports 
+												flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[j-1][0]));
+												flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[i-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
+											}else{
+												flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[i-1][0]));
+												flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[j-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
+											}
+											model.add(flowMinCapacityX[v][i][j][t]);
 										}
-										model.add(flowMinCapacityX[v][i][j][t]);
 									}
 								}
 							}
@@ -2066,35 +2079,37 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 						//For decreaseEndBlock
 						if(tS_add <= T){
 							if(t2>=tS_add && t2<=tF_add){ // Arc in the new added block or in the intersection with new block and previous interval
-								//Obj - traveling arcs
-								expr_obj_cost += arcCost[v][i][j][t]*x[v][i][j][t];							
-								if(inst.typePort[i-1] == 0 && inst.typePort[j-1] == 1){
-									ss << "travelAtCap_(" << i << "," << j << ")_" << t << "," << v;
-									travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);
-									travelAtCapacity[v][i][j][t].setName(ss.str().c_str());
-									model.add(travelAtCapacity[v][i][j][t]);
-								}else if (inst.typePort[i-1] == 1 && inst.typePort[j-1] == 0){
-									ss1 << "travelEmpty_(" << i << "," << j << ")_" << t << "," << v;
-									travelEmpty[v][i][j][t].setExpr(inst.q_v[v]*x[v][i][j][t] + fX[v][i][j][t]);
-									travelEmpty[v][i][j][t].setName(ss1.str().c_str());
-									model.add(travelEmpty[v][i][j][t]);
-								}
-								if (i != j){									
-                                    //Normal upper limit flow
-                                    flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss2.str().c_str());
-									if(tightenFlow){ //Thighter upper bound if traveling between 2 loading ports
-										if(inst.typePort[i-1] == inst.typePort[j-1]){ //Only for cases where ports are of the same type
-											if (inst.typePort[i-1] == 0){   //Loading ports 
-												flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[j-1][0]));
-												flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[i-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
-											}else{  // Discharging ports
-												flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[i-1][0]));
-												flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[j-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
-											}
-											model.add(flowMinCapacityX[v][i][j][t]);
-										}
+								if(hasArc[v][i][j][t] == 1){
+									//Obj - traveling arcs
+									expr_obj_cost += arcCost[v][i][j][t]*x[v][i][j][t];							
+									if(inst.typePort[i-1] == 0 && inst.typePort[j-1] == 1){
+										ss << "travelAtCap_(" << i << "," << j << ")_" << t << "," << v;
+										travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);
+										travelAtCapacity[v][i][j][t].setName(ss.str().c_str());
+										model.add(travelAtCapacity[v][i][j][t]);
+									}else if (inst.typePort[i-1] == 1 && inst.typePort[j-1] == 0){
+										ss1 << "travelEmpty_(" << i << "," << j << ")_" << t << "," << v;
+										travelEmpty[v][i][j][t].setExpr(inst.q_v[v]*x[v][i][j][t] + fX[v][i][j][t]);
+										travelEmpty[v][i][j][t].setName(ss1.str().c_str());
+										model.add(travelEmpty[v][i][j][t]);
 									}
-                                    model.add(flowCapacityX[v][i][j][t]);
+									if (i != j){									
+										//Normal upper limit flow
+										flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss2.str().c_str());
+										if(tightenFlow){ //Thighter upper bound if traveling between 2 loading ports
+											if(inst.typePort[i-1] == inst.typePort[j-1]){ //Only for cases where ports are of the same type
+												if (inst.typePort[i-1] == 0){   //Loading ports 
+													flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[j-1][0]));
+													flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[i-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
+												}else{  // Discharging ports
+													flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[i-1][0]));
+													flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[j-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
+												}
+												model.add(flowMinCapacityX[v][i][j][t]);
+											}
+										}
+										model.add(flowCapacityX[v][i][j][t]);
+									}
 								}
 							}
 						}
@@ -2110,22 +2125,24 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 						//For decreaseEndBlock
 						if(tS_add <= T){
 							if(t >= tS_add){ //Only for nodes in the current added block
-								//Obj
-								expr_obj_cost += arcCost[v][i][j][t]*x[v][i][j][t];
-								if(inst.typePort[i-1] == 0){
-									ss << "travelAtCap_(" << i << ",snk)_" << t << "," << v;
-									travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);	
-									travelAtCapacity[v][i][j][t].setName(ss.str().c_str());
-									model.add(travelAtCapacity[v][i][j][t]);
-								}else if (inst.typePort[i-1] == 1){ 
-									ss1 << "travelEmpty_(" << i << ",snk)_" << t << "," << v;
-									travelEmpty[v][i][j][t].setExpr(inst.q_v[v]*x[v][i][j][t] + fX[v][i][j][t]);
-									travelEmpty[v][i][j][t].setName(ss1.str().c_str());
-									model.add(travelEmpty[v][i][j][t]);
+								if(hasArc[v][i][j][t]==1){
+									//Obj
+									expr_obj_cost += arcCost[v][i][j][t]*x[v][i][j][t];
+									if(inst.typePort[i-1] == 0){
+										ss << "travelAtCap_(" << i << ",snk)_" << t << "," << v;
+										travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);	
+										travelAtCapacity[v][i][j][t].setName(ss.str().c_str());
+										model.add(travelAtCapacity[v][i][j][t]);
+									}else if (inst.typePort[i-1] == 1){ 
+										ss1 << "travelEmpty_(" << i << ",snk)_" << t << "," << v;
+										travelEmpty[v][i][j][t].setExpr(inst.q_v[v]*x[v][i][j][t] + fX[v][i][j][t]);
+										travelEmpty[v][i][j][t].setName(ss1.str().c_str());
+										model.add(travelEmpty[v][i][j][t]);
+									}
+									
+									flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss2.str().c_str());
+									model.add(flowCapacityX[v][i][j][t]);
 								}
-								
-								flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss2.str().c_str());
-								model.add(flowCapacityX[v][i][j][t]);
 							}
 						}
 						//For integralizingBlock
@@ -3454,7 +3471,7 @@ double& incumbent, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, con
 void mirp::fixAndRelax(string file, string optStr, const double& nIntervals, const double& gapFirst, const int& f, const double& overLap, const int& endBlock,
 const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSecond, const double& gapSecond,
  const double& overlap2, const double& timeLimit,  const bool& validIneq, const bool& addConstr, 
- const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& preprocessing, const bool& tightenFlow){
+ const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceArcs, const bool& tightenFlow){
 	///Time parameters
 	Timer<chrono::milliseconds> timer_cplex;
 	Timer<chrono::milliseconds> timer_global;
@@ -3488,7 +3505,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		timer_1stPhase.start();
 		Model model(env);
 		model.buildFixAndRelaxModel(env,inst, nIntervals, endBlock, validIneq, addConstr, tightenInvConstr, 
-			proportionalAlpha, preprocessing, tightenFlow);
+			proportionalAlpha, reduceArcs, tightenFlow);
 		model.setParameters(env, timePerIterFirst, gapFirst);
         //~ model.cplex.exportModel("mip_R&F.lp");
 		//Relax-and-fix
@@ -3547,7 +3564,9 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		double incumbent = obj1stPhase;
 		//~ //~ cout "Solution Status " << model.cplex.getStatus() << " Value: " << obj1stPhase << endl;
 		
-     
+		//~ model.printSolution(env, inst, T);
+		
+
         #ifndef NImprovementPhase
 		//~ //~ cout "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
         model.fixAllSolution(env, inst);

@@ -843,9 +843,9 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 						//~ cout << "Z value " << v << " " << i << " " << t << " " << zValue[v][i][t] << endl;
 						if(zValue[v][i][t]>=0.1)
 							costAtempt += (t-1)*inst.attemptCost;
-						
+						#ifndef WaitAfterOperate
 						oAValue[v][i][t] = cplex.getValue(oA[v][i][t]);				
-						
+						#endif
 						fValue[v][i][t] = cplex.getValue(f[v][i][t]);
 						if(zValue[v][i][t]>=0.1)
 							revenue += fValue[v][i][t]*inst.r_jt[i-1][t-1];

@@ -41,7 +41,7 @@ stringstream file;
 string optstr;
 double timeLimit, gapFirst, gapSecond, overLap, mIntervals, nIntervals, overlap2;
 int opt, endBlock, outVessel, timePerIterFirst, timePerIterSecond, f ;
-bool validIneq, addConstr, tightenInvConstr, proportionalAlpha, preprocessing, tightenFlow;
+bool validIneq, addConstr, tightenInvConstr, proportionalAlpha, reduceArcs, tightenFlow;
 vector <string> instances;
 instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_3_VC1_V7a/");
 instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_4_VC3_V11a/");
@@ -98,7 +98,7 @@ while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:b:n:g:f:o:e:r:l:m:i:h:u:")) !=
 			proportionalAlpha = atoi(optarg);
 			break;
 		case 'z':
-			preprocessing = atoi(optarg);
+			reduceArcs = atoi(optarg);
 			break;
 		case 'b':
 			tightenFlow = atoi(optarg);
@@ -174,13 +174,13 @@ while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:b:n:g:f:o:e:r:l:m:i:h:u:")) !=
         for(int i=0;i<instances.size();i++){
             mirp::fixAndRelax(instances[i], optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, 
 				mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit, validIneq, addConstr, tightenInvConstr,
-				proportionalAlpha, preprocessing,tightenFlow);
+				proportionalAlpha, reduceArcs,tightenFlow);
         }
         #endif
         #ifdef NTestInstanceSet
         mirp::fixAndRelax(file.str(), optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, 
 			mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit, validIneq, addConstr, tightenInvConstr,
-			proportionalAlpha, preprocessing,tightenFlow);
+			proportionalAlpha, reduceArcs,tightenFlow);
         #endif
 		break;
 	case 3:
