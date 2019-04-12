@@ -22,6 +22,7 @@ ss << "usuage is \n -v : Version (1 - for MILP; 2- for fix-and-relax vertically;
 	<< "-d : 1 if use tightening of inventory contraints, 0 otherwise (only when e > 0) \n"
 	<< "-k : 1 if use of proportional alphaMaxJ, 0 otherwise (only when e > 0) \n"
 	<< "-z : 1 if simplify instance, 0 otherwise \n"
+	<< "-b : 1 if bounds on flow fOB(fWB) and fX are tighten\n"
 	
 	<< "For -v = {2,3} (Fix and relax algorithm):\n " 
 	<< "-n : Number of intervals in the first phase (-v =2) \n "
@@ -40,7 +41,7 @@ stringstream file;
 string optstr;
 double timeLimit, gapFirst, gapSecond, overLap, mIntervals, nIntervals, overlap2;
 int opt, endBlock, outVessel, timePerIterFirst, timePerIterSecond, f ;
-bool validIneq, addConstr, tightenInvConstr, proportionalAlpha, preprocessing;
+bool validIneq, addConstr, tightenInvConstr, proportionalAlpha, preprocessing, tightenFlow;
 vector <string> instances;
 instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_3_VC1_V7a/");
 instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_4_VC3_V11a/");
@@ -56,21 +57,21 @@ instances.push_back("../Group1_data_format_only_files/LR2_11_DR2_33_VC5_V12a/");
 instances.push_back("../Group1_data_format_only_files/LR2_22_DR2_22_VC3_V10a/");
 instances.push_back("../Group1_data_format_only_files/LR2_22_DR3_333_VC4_V14a/");
 instances.push_back("../Group1_data_format_only_files/LR2_22_DR3_333_VC4_V17a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_3_VC1_V7a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V11a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V12a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V12b/");
-instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V8a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V9a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR1_2_DR1_3_VC2_V6a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR1_2_DR1_3_VC3_V8a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_22_VC3_V6a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC4_V11a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC5_V12a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR2_22_VC3_V10a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V14a/");
-instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V17a/");
-while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:n:g:f:o:e:r:l:m:i:h:u:")) != EOF)
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_3_VC1_V7a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V11a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V12a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V12b/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V8a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V9a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR1_2_DR1_3_VC2_V6a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR1_2_DR1_3_VC3_V8a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_22_VC3_V6a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC4_V11a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC5_V12a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR2_22_VC3_V10a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V14a/");
+//~ instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V17a/");
+while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:b:n:g:f:o:e:r:l:m:i:h:u:")) != EOF)
 	switch(opt)
 	{
 		case 'v': 
@@ -99,9 +100,12 @@ while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:n:g:f:o:e:r:l:m:i:h:u:")) != E
 		case 'z':
 			preprocessing = atoi(optarg);
 			break;
+		case 'b':
+			tightenFlow = atoi(optarg);
+			break;
 		case 'n':
 			nIntervals = stod(optarg);
-			break;
+			break;		
 		case 'g':
 			gapFirst = stod(optarg);
 			break;
@@ -151,9 +155,9 @@ while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:n:g:f:o:e:r:l:m:i:h:u:")) != E
 		#endif
 				
 	case 2: 
-		if (endBlock + 2 > ceil(nIntervals)) {
-			cout << "Error! Size of end block must be at leat 2 units less than the number of intervals)" << endl;
-		}
+		//~ if (endBlock + 2 > ceil(nIntervals)) {
+			//~ cout << "Error! Size of end block must be at leat 2 units less than the number of intervals)" << endl;
+		//~ }
 		//Header
 		//~ cout << "Instance\t"  <<
 				//~ "Iter(RF)\t"  <<
@@ -170,13 +174,13 @@ while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:n:g:f:o:e:r:l:m:i:h:u:")) != E
         for(int i=0;i<instances.size();i++){
             mirp::fixAndRelax(instances[i], optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, 
 				mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit, validIneq, addConstr, tightenInvConstr,
-				proportionalAlpha, preprocessing);
+				proportionalAlpha, preprocessing,tightenFlow);
         }
         #endif
         #ifdef NTestInstanceSet
         mirp::fixAndRelax(file.str(), optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, 
 			mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit, validIneq, addConstr, tightenInvConstr,
-			proportionalAlpha, preprocessing);
+			proportionalAlpha, preprocessing,tightenFlow);
         #endif
 		break;
 	case 3:

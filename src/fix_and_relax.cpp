@@ -17,7 +17,7 @@
 #define NStartUPValidInequalities
 #define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
 #define NFixSinkArc         
-#define NModifiedFlow
+
 //~ #define FixedGAP
 #define NImprovementPhase
 #define NRandomTimeInterval				//Defined: Sequential selection of time intervals in the improvementPhase_timeIntervals, otherwise random selection
@@ -46,10 +46,11 @@ using mirp::Instance;
  * - tightenInvConstr: Tights the inventory constraints of the ports in the last time period when part of the model is ommited
  * - proportionalAlpha: Forbid usign all available alpha before ommiting part of the model
  * - preprocessing: Does not consider the arcs between port of same type and different regions, or ports i,j of the same region with F^Min_i+F^Min_j > Q_v
+ * - tightenFlow: For flow variables fWB(fOB) - for DP change the upper bound, for LP create a lower bound
  */
 void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nIntervals, const int& endBlock, 
 		const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha,
-		const bool& preprocessing){	
+		const bool& preprocessing, const bool& tightenFlow){	
 	int i, j,t,v,a;
 	int timePerIntervalId = inst.t/nIntervals; //Number of time periods in each interval
 	int J = inst.numTotalPorts;
@@ -575,18 +576,17 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	flowCapacityWB = IloArray<IloArray<IloRangeArray> >(env,V);
 	#endif
     //Flow lower limits
-    #ifndef NModifiedFlow
-	flowMinCapacityX = IloArray<IloArray<IloArray<IloRangeArray> > > (env,V);
-	flowMinCapacityOA = IloArray<IloArray<IloRangeArray> >(env,V);
-	flowMinCapacityW = IloArray<IloArray<IloRangeArray> >(env,V);
-	#ifndef WaitAfterOperate	
-	flowMinCapacityOB = IloArray<IloArray<IloRangeArray> >(env,V);
-	#endif
-	#ifdef WaitAfterOperate	
-	flowMinCapacityWB = IloArray<IloArray<IloRangeArray> >(env,V);
-	#endif
-    #endif
-    
+    if(tightenFlow){
+		flowMinCapacityX = IloArray<IloArray<IloArray<IloRangeArray> > > (env,V);
+		flowMinCapacityOA = IloArray<IloArray<IloRangeArray> >(env,V);
+		flowMinCapacityW = IloArray<IloArray<IloRangeArray> >(env,V);
+		#ifndef WaitAfterOperate	
+		flowMinCapacityOB = IloArray<IloArray<IloRangeArray> >(env,V);
+		#endif
+		#ifdef WaitAfterOperate	
+		flowMinCapacityWB = IloArray<IloArray<IloRangeArray> >(env,V);
+		#endif
+	}
     //WWCC reformulation
     #ifndef NWWCCReformulation
     IloExpr expr_sumF(env);
@@ -937,17 +937,17 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		flowCapacityWB[v] = IloArray<IloRangeArray> (env,N-1);
 		#endif
 		
-        #ifndef NModifiedFlow
-        flowMinCapacityX[v] = IloArray<IloArray<IloRangeArray> >(env,N);
-		flowMinCapacityOA[v] = IloArray<IloRangeArray> (env,N-1);
-		#ifndef WaitAfterOperate
-		flowMinCapacityOB[v] = IloArray<IloRangeArray> (env,N-1);
-		#endif
-		flowMinCapacityW[v] = IloArray<IloRangeArray> (env,N-1);
-		#ifdef WaitAfterOperate
-		flowMinCapacityWB[v] = IloArray<IloRangeArray> (env,N-1);
-		#endif
-        #endif
+        if(tightenFlow){
+			flowMinCapacityX[v] = IloArray<IloArray<IloRangeArray> >(env,N);
+			flowMinCapacityOA[v] = IloArray<IloRangeArray> (env,N-1);
+			#ifndef WaitAfterOperate
+			flowMinCapacityOB[v] = IloArray<IloRangeArray> (env,N-1);
+			#endif
+			flowMinCapacityW[v] = IloArray<IloRangeArray> (env,N-1);
+			#ifdef WaitAfterOperate
+			flowMinCapacityWB[v] = IloArray<IloRangeArray> (env,N-1);
+			#endif
+		}
         
 		for(i=0;i<N;i++){
 			if(i>0 && i <= J){ //Only considering ports				
@@ -1009,17 +1009,16 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				flowCapacityWB[v][i] = IloRangeArray(env,T);
 				#endif
                 
-                #ifndef NModifiedFlow
-				flowMinCapacityOA[v][i] = IloRangeArray(env,T);
-				#ifndef WaitAfterOperate
-				flowMinCapacityOB[v][i] = IloRangeArray(env,T);
-				#endif
-				flowMinCapacityW[v][i] = IloRangeArray(env,T);
-				#ifdef WaitAfterOperate
-				flowMinCapacityWB[v][i] = IloRangeArray(env,T);
-				#endif
-                #endif
-
+                if(tightenFlow){
+					flowMinCapacityOA[v][i] = IloRangeArray(env,T);
+					#ifndef WaitAfterOperate
+					flowMinCapacityOB[v][i] = IloRangeArray(env,T);
+					#endif
+					flowMinCapacityW[v][i] = IloRangeArray(env,T);
+					#ifdef WaitAfterOperate
+					flowMinCapacityWB[v][i] = IloRangeArray(env,T);
+					#endif
+                }
                 #ifndef NBranching
                 //~ IloExpr expr_sumEnteringX(env);
                 IloExpr expr_sumOA(env);                    
@@ -1196,22 +1195,26 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					stringstream ss7_1;
                     ss7_1 << "flowMinLimitOA_"<<v<<","<<i<<","<<t;
 					#ifndef WaitAfterOperate
-					flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*oA[v][i][t], 0, ss7.str().c_str());
-                    #ifndef NModifiedFlow
-                    if(inst.typePort[i-1] == 1){ //Minimum flow arriving at a discharging port
-                        flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*oA[v][i][t]-fOA[v][i][t], 0, ss7_1.str().c_str());
-                        model.add(flowMinCapacityOA[v][i][t]);
-                    }
-                    #endif
+					flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-oA[v][i][t]*inst.q_v[v], 0, ss7.str().c_str());
+                    if(tightenFlow){
+						if(inst.typePort[i-1] == 1){ //Minimum flow in discharging ports
+							flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, oA[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
+							model.add(flowMinCapacityOA[v][i][t]);
+						}else{ //Change upper bound for loading ports
+							flowCapacityOA.setExpr(fOA[v][i][t] - oA[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+						}
+					}
 					#endif
 					#ifdef WaitAfterOperate
-					flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*z[v][i][t], 0, ss7.str().c_str());
-                    #ifndef NModifiedFlow
-                    if(inst.typePort[i-1] == 1){ //Minimum flow arriving at a discharging port
-                        flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*z[v][i][t]-fOA[v][i][t], 0, ss7_1.str().c_str());
-                        model.add(flowMinCapacityOA[v][i][t]);
-                    }
-                    #endif
+					flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-z[v][i][t]*inst.q_v[v], 0, ss7.str().c_str());
+                    if(tightenFlow){
+						if(inst.typePort[i-1] == 1){ //Minimum flow in discharging port
+							flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, z[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
+							model.add(flowMinCapacityOA[v][i][t]);
+						}else{ //Change upper bound for loading ports
+							flowCapacityOA[v][i][t].setExpr(fOA[v][i][t] - z[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+						}
+					}                    
 					#endif
 					model.add(flowCapacityOA[v][i][t]);
 					
@@ -1220,39 +1223,43 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 						ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
                         stringstream ss8_1;
                         ss8 << "flowMinLimitOB_"<<v<<","<<i<<","<<t;
-						flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-inst.q_v[v]*oB[v][i][t], 0, ss8.str().c_str());
+						flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-oB[v][i][t](inst.q_v[v]), 0, ss8.str().c_str());
 						model.add(flowCapacityOB[v][i][t]);
-                        #ifndef NModifiedFlow
-                        if(inst.typePort[i-1] == 1){ //Minimum flow at a discharging port
-                            flowMinCapacityOB[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*oB[v][i][t] - fOB[v][i][t], 0, ss8_1.str().c_str());
-                            model.add(flowMinCapacityOB[v][i][t]);
-                        }
-                        #endif
+						if(tightenFlow){
+							//Equal for discharging and loading ports
+							flowMinCapacityOB[v][i][t] = IloRange(env, -IloInfinity, oB[v][i][t]*inst.f_min_jt[i-1][t-1] - fOB[v][i][t], 0, ss8_1.str().c_str());
+							model.add(flowMinCapacityOB[v][i][t]);
+							flowCapacityOB[v][i][t].setExpr(oB[v][i][t](inst.q_v[v]-inst.f_min_jt[i-1][t-1]) - fOB[v][i][t]);
+						}
+						#endif
+
+						#ifdef WaitAfterOperate
+						ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
+                        stringstream ss10_1;
+                        ss10_1 << "flowMinLimitWB_"<<v<<","<<i<<","<<t;
+						
+						flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
+						model.add(flowCapacityWB[v][i][t]);
+                        if(tightenFlow){
+							//Equal for discharging and loading ports
+							flowMinCapacityWB[v][i][t] = IloRange(env, -IloInfinity, wB[v][i][t]*inst.f_min_jt[i-1][t-1]-fWB[v][i][t], 0, ss10_1.str().c_str());
+							model.add(flowMinCapacityWB[v][i][t]);
+							flowCapacityWB[v][i][t].setExpr(wB[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1])-fWB[v][i][t]);							
+						}
 						#endif
 						ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
                         stringstream ss9_1;
                         ss9_1 << "flowLimitW_"<<v<<","<<i<<","<<t;
 						flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());
 						model.add(flowCapacityW[v][i][t]);
-                        #ifndef NModifiedFlow
-                        if(inst.typePort[i-1] == 1){ //Lower bound on flow for discharging ports
-                            flowMinCapacityW[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*w[v][i][t]-fW[v][i][t], 0, ss9_1.str().c_str());
-                            model.add(flowMinCapacityW[v][i][t]);
+                        if(tightenFlow){
+							if(inst.typePort[i-1] == 1){ //Lower bound on flow for discharging ports
+								flowMinCapacityW[v][i][t] = IloRange(env, -IloInfinity, w[v][i][t]*inst.f_min_jt[i-1][t-1]-fW[v][i][t], 0, ss9_1.str().c_str());
+								model.add(flowMinCapacityW[v][i][t]);
+							}else{ //Upper bound on loading ports
+								flowCapacityW[v][i][t].setExpr(fW[v][i][t]-w[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+							}
                         }
-                        #endif
-						#ifdef WaitAfterOperate
-						ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
-                        stringstream ss10_1;
-                        ss10_1 << "flowMinLimitWB_"<<v<<","<<i<<","<<t;
-						flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
-						model.add(flowCapacityWB[v][i][t]);
-                        #ifndef NModifiedFlow
-                        if(inst.typePort[i-1] == 1){
-                            flowMinCapacityWB[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*wB[v][i][t]-fWB[v][i][t], 0, ss10_1.str().c_str());
-                            model.add(flowMinCapacityWB[v][i][t]);
-                        }
-                        #endif
-						#endif
 					}
                     
                     #ifndef NBranching                    
@@ -1260,9 +1267,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                     #endif
 				}
                 flowCapacityX[v][i] = IloArray<IloRangeArray>(env,N);
-                #ifndef NModifiedFlow
-                flowMinCapacityX[v][i] = IloArray<IloRangeArray>(env,N);
-                #endif
+                if(tightenFlow){
+					flowMinCapacityX[v][i] = IloArray<IloRangeArray>(env,N);
+				}	
                 
                 #ifndef NBranching                
                 //~ priorityX[v][i] = IloRange(env, 0, expr_sumEnteringX - sumX[v][i], 0);
@@ -1274,9 +1281,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				for(j=1;j<N;j++){ //No arriving arc in source arc j=0
 					if(i != j && i < N-1){ //There is no departing arc from sink node
 						flowCapacityX[v][i][j] = IloRangeArray(env,T);
-						#ifndef NModifiedFlow
-                        flowMinCapacityX[v][i][j] = IloRangeArray(env,T);
-                        #endif
+						if(tightenFlow){
+							flowMinCapacityX[v][i][j] = IloRangeArray(env,T);
+                        }
 						for(t=0;t<=tOEB;t++){
 							stringstream ss,ss1;
 							ss << "flowLimitX_" << v << "," << i << "," << j << "," << t;
@@ -1287,19 +1294,19 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 							}else if (i>0 && t + inst.travelTime[v][i-1][j-1] <= tOEB){ //If x variable reach j in the time period
 								//Original flow upper limit
                                 flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss.str().c_str());
-                                #ifndef NModifiedFlow //Tighter upper limit
-                                if (inst.typePort[i-1] == 0 && inst.typePort[i-1] == inst.typePort[j-1]){    //Thighter upper bound if traveling between 2 loading ports
-                                    flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[j-1][0]), 0, ss.str().c_str());
-                                }
-                                #endif                                
                                 model.add(flowCapacityX[v][i][j][t]);
-                                
-                                #ifndef NModifiedFlow
-                                if(inst.typePort[j-1]==1){ //Minimun flow when arriving at a discharging port
-                                    flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, inst.f_min_jt[j-1][0]*x[v][i][j][t] - fX[v][i][j][t] , 0, ss1.str().c_str());
-                                    model.add(flowMinCapacityX[v][i][j][t]);
-                                }
-                                #endif
+                                if(tightenFlow){ //Thighter upper bound if traveling between 2 loading ports
+									if(inst.typePort[i-1] == inst.typePort[j-1]){ //Only for cases where ports are of the same type
+										if (inst.typePort[i-1] == 0){   //Loading ports 
+											flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[j-1][0]));
+											flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[i-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
+										}else{
+											flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[i-1][0]));
+											flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[j-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
+										}
+										model.add(flowMinCapacityX[v][i][j][t]);
+									}
+								}
 							}
 						}
 					}
@@ -1525,7 +1532,7 @@ void Model::getSolValsW(IloEnv& env, Instance inst, const int& tS, const int& tF
             }
         }
 	}else{
-		//~ //~ cout "Impossible to get feasible solution values!" << endl;
+		//~ cout << "Impossible to get feasible solution values!" << endl;
 		exit(1);
 	}
 }
@@ -1567,7 +1574,7 @@ void Model::getSolution(IloEnv& env, Instance inst){
             }
         }
 	}else{
-		//~ cout "Impossible to get feasible solution values!" << endl;
+		//~ cout << "Impossible to get feasible solution values!" << endl;
 		exit(1);
 	}
 }
@@ -1611,14 +1618,14 @@ void Model::getSolutionVesselPair(IloEnv& env, Instance inst, const unsigned int
             }
         }
 	}else{
-		//~ cout "Impossible to get feasible solution values!" << endl;
+		//~ cout << "Impossible to get feasible solution values!" << endl;
 		exit(1);
 	}
 }
 
 void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const int& tS_fix, const int& tF_fix, 
     const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int, const bool& validIneq,
-    const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha){
+    const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& tightenFlow){
 	int i,j,t,v,a, t0;
 	int T = inst.t;
 	int timePerIntervalId = T/nIntervals; //Number of time periods in each interval
@@ -1628,16 +1635,17 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
     int N = J + 1;    	
 	//First gets the solution values for fixing (when needed)
 	if (tS_fix < T){		
-		//~ cout "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
+		//~ cout <<  "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
 		getSolValsW(env, inst, tS_fix, tF_fix, false);	//Get only values of the interval for fixing
 	}
 	
-	//~ if (tS_int <= T)
-		//~ cout "Integralizing: [" << tS_int << "," << tF_int << "]\n";
-	
+	//~ if (tS_int <= T){
+		//~ cout << "Integralizing: [" << tS_int << "," << tF_int << "]\n";
+	//~ }	
 	///Removing end-block
-	//~ if(tS_add <= T)
-		//~ cout "Adding to the model [" << tS_add << "," << tF_add << "]\n";
+	//~ if(tS_add <= T){
+		//~ cout << "Adding to the model [" << tS_add << "," << tF_add << "]\n";
+	//~ }
 		
     ///Objective function	
 	IloExpr expr_obj_current = cplex.getObjective().getExpr(); //Gets the current objective function
@@ -2074,16 +2082,18 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 								if (i != j){									
                                     //Normal upper limit flow
                                     flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t], 0, ss2.str().c_str());
-                                    #ifndef NModifiedFlow
-                                    if (inst.typePort[i-1] == 0 && inst.typePort[i-1] == inst.typePort[j-1]){    //Thighter upper bound if traveling between 2 loading ports
-                                        flowCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, 
-                                            fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[j-1][0]), 0, ss2.str().c_str());
-                                    }
-                                    if(inst.typePort[j-1]==1){ //Minimun flow when arriving at a discharging port
-                                        flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, inst.f_min_jt[j-1][0]*x[v][i][j][t] - fX[v][i][j][t] , 0, ss3.str().c_str());
-                                        model.add(flowMinCapacityX[v][i][j][t]);
-                                    }
-                                    #endif
+									if(tightenFlow){ //Thighter upper bound if traveling between 2 loading ports
+										if(inst.typePort[i-1] == inst.typePort[j-1]){ //Only for cases where ports are of the same type
+											if (inst.typePort[i-1] == 0){   //Loading ports 
+												flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[j-1][0]));
+												flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[i-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
+											}else{  // Discharging ports
+												flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - x[v][i][j][t]*(inst.q_v[v]-inst.f_min_jt[i-1][0]));
+												flowMinCapacityX[v][i][j][t] = IloRange(env, -IloInfinity, x[v][i][j][t]*inst.f_min_jt[j-1][0] - fX[v][i][j][t] , 0, ss1.str().c_str());
+											}
+											model.add(flowMinCapacityX[v][i][j][t]);
+										}
+									}
                                     model.add(flowCapacityX[v][i][j][t]);
 								}
 							}
@@ -2329,22 +2339,25 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 						stringstream ss7_1;
                         ss7_1 << "flowMinLimitOA_"<<v<<","<<i<<","<<t;
 						#ifndef WaitAfterOperate
-						flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*oA[v][i][t], 0, ss7.str().c_str());
-                        #ifndef NModifiedFlow
-                        if(inst.typePort[i-1] == 1){ //Minimum flow arriving at a discharging port
-                            flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*oA[v][i][t]-fOA[v][i][t], 0, ss7_1.str().c_str());
-                            model.add(flowMinCapacityOA[v][i][t]);
-                        }
-                        #endif
+						if(tightenFlow){
+							if(inst.typePort[i-1] == 1){ //Minimum flow in discharging ports
+								flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, oA[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
+								model.add(flowMinCapacityOA[v][i][t]);
+							}else{ //Change upper bound for loading ports
+								flowCapacityOA.setExpr(fOA[v][i][t] - oA[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+							}
+						}
 						#endif
 						#ifdef WaitAfterOperate
 						flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*z[v][i][t], 0, ss7.str().c_str());
-                        #ifndef NModifiedFlow
-                        if(inst.typePort[i-1] == 1){ //Minimum flow arriving at a discharging port
-                            flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*z[v][i][t]-fOA[v][i][t], 0, ss7_1.str().c_str());
-                            model.add(flowMinCapacityOA[v][i][t]);
-                        }
-                        #endif
+     					if(tightenFlow){
+							if(inst.typePort[i-1] == 1){ //Minimum flow in discharging port
+								flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, z[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
+								model.add(flowMinCapacityOA[v][i][t]);
+							}else{ //Change upper bound for loading ports
+								flowCapacityOA[v][i][t].setExpr(fOA[v][i][t] - z[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+							}
+						}   
 						#endif
 						model.add(flowCapacityOA[v][i][t]);
 						
@@ -2355,37 +2368,38 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
                             ss8_1 << "flowMinLimitOB_"<<v<<","<<i<<","<<t;
 							flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-inst.q_v[v]*oB[v][i][t], 0, ss8.str().c_str());
 							model.add(flowCapacityOB[v][i][t]);
-                            #ifndef NModifiedFlow
-                            if(inst.typePort[i-1] == 1){
-                                flowMinCapacityOB[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*oB[v][i][t] - fOB[v][i][t], 0, ss8_1.str().c_str());
-                                model.add(flowMinCapacityOB[v][i][t]);
-                            }
-                            #endif
-                            
+							if(tightenFlow){
+								if(inst.typePort[i-1] == 1){
+									flowMinCapacityOB[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*oB[v][i][t] - fOB[v][i][t], 0, ss8_1.str().c_str());
+									model.add(flowMinCapacityOB[v][i][t]);
+								}
+							}
 							#endif
 							ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
-                            stringstream ss9_1;
-                            ss9 << "flowMinLimitW_"<<v<<","<<i<<","<<t;
-							flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());							
+							stringstream ss9_1;
+							ss9_1 << "flowLimitW_"<<v<<","<<i<<","<<t;
+							flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());
 							model.add(flowCapacityW[v][i][t]);
-                            #ifndef NModifiedFlow
-                            if(inst.typePort[i-1] == 1){ //Lower bound on flow for discharging ports
-                                flowMinCapacityW[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*w[v][i][t]-fW[v][i][t], 0, ss9_1.str().c_str());
-                                model.add(flowMinCapacityW[v][i][t]);
-                            }
-                            #endif
+							if(tightenFlow){
+								if(inst.typePort[i-1] == 1){ //Lower bound on flow for discharging ports
+									flowMinCapacityW[v][i][t] = IloRange(env, -IloInfinity, w[v][i][t]*inst.f_min_jt[i-1][t-1]-fW[v][i][t], 0, ss9_1.str().c_str());
+									model.add(flowMinCapacityW[v][i][t]);
+								}else{ //Upper bound on loading ports
+									flowCapacityW[v][i][t].setExpr(fW[v][i][t]-w[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+								}
+							}
 							#ifdef WaitAfterOperate
 							ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
                             stringstream ss10_1;
                             ss10_1 << "flowMinLimitWB_"<<v<<","<<i<<","<<t;
 							flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
 							model.add(flowCapacityWB[v][i][t]);
-                            #ifndef NModifiedFlow
-                            if(inst.typePort[i-1] == 1){
-                                flowMinCapacityWB[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*wB[v][i][t]-fWB[v][i][t], 0, ss10_1.str().c_str());
-                                model.add(flowMinCapacityWB[v][i][t]);
-                            }
-                            #endif
+							if(tightenFlow){
+								//Equal for discharging and loading ports
+								flowMinCapacityWB[v][i][t] = IloRange(env, -IloInfinity, wB[v][i][t]*inst.f_min_jt[i-1][t-1]-fWB[v][i][t], 0, ss10_1.str().c_str());
+								model.add(flowMinCapacityWB[v][i][t]);
+								flowCapacityWB[v][i][t].setExpr(wB[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1])-fWB[v][i][t]);							
+							}
 							#endif
 						}
                         ///Another port-time iteraror (i,t)
@@ -3440,7 +3454,7 @@ double& incumbent, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, con
 void mirp::fixAndRelax(string file, string optStr, const double& nIntervals, const double& gapFirst, const int& f, const double& overLap, const int& endBlock,
 const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSecond, const double& gapSecond,
  const double& overlap2, const double& timeLimit,  const bool& validIneq, const bool& addConstr, 
- const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& preprocessing){
+ const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& preprocessing, const bool& tightenFlow){
 	///Time parameters
 	Timer<chrono::milliseconds> timer_cplex;
 	Timer<chrono::milliseconds> timer_global;
@@ -3460,7 +3474,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		inst.readInstance(env, file);
 		//Verify if the number of intervals is compatible with the instance
 		//~ if(fmod((double)inst.t ,nIntervals) != 0 || fmod((double)inst.t,mIntervals != 0)){
-			//~ cout << "Error: the number of intervals n or m must be a divisor of Time instace without rest" << endl;
+			//~ //~ cout << "Error: the number of intervals n or m must be a divisor of Time instace without rest" << endl;
 			//~ exit(1);
 		//~ }
 		
@@ -3474,7 +3488,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		timer_1stPhase.start();
 		Model model(env);
 		model.buildFixAndRelaxModel(env,inst, nIntervals, endBlock, validIneq, addConstr, tightenInvConstr, 
-			proportionalAlpha, preprocessing);
+			proportionalAlpha, preprocessing, tightenFlow);
 		model.setParameters(env, timePerIterFirst, gapFirst);
         //~ model.cplex.exportModel("mip_R&F.lp");
 		//Relax-and-fix
@@ -3485,9 +3499,9 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
         #ifdef NRelaxation
         for (v=1; v <= maxIt; v++){
 			timer_cplex.start();
-			//~ //~ cout "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
+			//~ cout << "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
 			if(!model.cplex.solve()){
-				//~ //~ cout model.cplex.getStatus() << endl;
+				//~ cout << model.cplex.getStatus() << endl;
 				opt_time += timer_cplex.total();
 				abortedRF = true;
 				obj1stPhase = 99999999;
@@ -3509,7 +3523,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
             //~ model.printSolution(env, inst, t2S-1);
 
 			model.modifyModel(env, inst, nIntervals, t3S, t3F, t2S, t2F, t1S, t1F, 
-				validIneq, addConstr, tightenInvConstr, proportionalAlpha);
+				validIneq, addConstr, tightenInvConstr, proportionalAlpha, tightenFlow);
             //~ model.cplex.exportModel("mip_R&F.lp");
             
             #ifndef FixedGAP
@@ -3625,17 +3639,18 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
         
         #ifndef NRelaxation        
         /// Data
-        //~ cout file << "\t" <<
-				//~ opt_time/1000 << "\t" <<
-				//~ obj1stPhase << "\t" << 				
-				//~ endl;
+        cout << file << "\t" <<
+				opt_time/1000 << "\t" <<
+				obj1stPhase << "\t" << 				
+				endl;
         #endif
 	}catch (IloException& e) {
-		cerr << "Concert exception caught: " << e << endl;		
+		//~ cerr << "Concert exception caught: " << e << endl;		
+		cerr << 99999999 << endl;		
 		e.end();
 	}
 	catch (...) {
-		cerr << "Unknown exception caught" << endl;
+		//~ cerr << "Unknown exception caught" << endl;
 	}
 	env.end();
 }

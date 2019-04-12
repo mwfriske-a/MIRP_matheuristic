@@ -19,7 +19,7 @@ namespace mirp{
 	 const double& mIntervals, const int& timePerIter2, const double& gapSecond, 
 	 const double& overlap2,const double& timeLimit,
 	 const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha,
-	 const bool& instanceSimplify);
+	 const bool& instanceSimplify, const bool& tightenFlow);
 	
 	void fixAndRelaxH(std:: string file, std::string optStr, const double& gapFirst, const int& outVessels, const int& timeLimitFirst, 
 	const double& mIntervals, const int& timeLimitSecond, const double& gapSecond,const double& overlap2);
@@ -176,10 +176,10 @@ namespace mirp{
 			model.add(obj);		
 		};	
 		void buildModel(IloEnv& env, Instance inst); 
-		void buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nIntervals, const int& endBlock, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& preprocessing); 
+		void buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nIntervals, const int& endBlock, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& preprocessing, const bool& tightenFlow); 
 		void setParameters(IloEnv& env, const double& timeLimit, const double& gap);
 		void fixSolution(IloEnv& env, Instance inst, const int& t3S, const int& t3F, const int& p, const bool& fixSinkArc);
-		void modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const int& tS_fix, const int& tF_fix, const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha);
+		void modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const int& tS_fix, const int& tF_fix, const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& tightenFlow);
 		void fixAllSolution(IloEnv& env, const Instance& inst);
 		void decreaseEndBlock (IloEnv& env, Instance inst, const double& nIntervals, const int& t2S, const int& t2F); //Add to the model FO and constranints the variables between t2S and t2F
 		void reIntegralize(IloEnv& env, Instance inst, const int& t1S, const int& t1F);

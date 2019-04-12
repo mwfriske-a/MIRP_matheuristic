@@ -37,3 +37,4 @@ addConstr		"-c "				i	(0,1)
 tightenInv		"-d "				i	(0,1)	| EndBlock > 0
 propAlpha		"-k "				i	(0,1)	| EndBlock > 0
 preprocessing	"-z "				i	(0,1)
+tightFlow		"-b " 				i	(0,1)
