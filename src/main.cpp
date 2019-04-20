@@ -87,7 +87,8 @@ while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:b:n:g:f:o:e:r:l:m:i:h:u:")) !=
 			optstr = optarg;
 			break;
 		case 'q':
-			validIneq = atoi(optarg);			
+			validIneq = atoi(optarg);
+			break;			
 		case 'c':
 			addConstr = atoi(optarg);
 			break;

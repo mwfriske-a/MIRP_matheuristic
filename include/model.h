@@ -5,6 +5,8 @@
 
 #include "util.h"
 
+using namespace std;
+
 namespace mirp{		
 	typedef IloArray<IloNumVarArray> NumVarMatrix;
 	typedef IloArray<IloIntVarArray> IntVarMatrix;
@@ -12,22 +14,23 @@ namespace mirp{
 	typedef IloArray<IloIntArray> IntMatrix;
 	typedef IloArray<IloBoolVarArray> BoolMatrix; 
 	
-	void milp(std::string file, const double& timeLimit, std::string optStr);
+	void milp(string file, const double& timeLimit, string optStr);
 	
-	void fixAndRelax(std::string file, std::string optStr, const double& nIntervals, const double& gapFirst,
+	void fixAndRelax(string file, string optStr, const double& nIntervals, const double& gapFirst,
 	 const int& f, const double& overLap, const int& endBlockFirst, const int& timePerIter, 
 	 const double& mIntervals, const int& timePerIter2, const double& gapSecond, 
 	 const double& overlap2,const double& timeLimit,
 	 const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha,
 	 const bool& instanceSimplify, const bool& tightenFlow);
 	
-	void fixAndRelaxH(std:: string file, std::string optStr, const double& gapFirst, const int& outVessels, const int& timeLimitFirst, 
+	void fixAndRelaxH( string file, string optStr, const double& gapFirst, const int& outVessels, const int& timeLimitFirst, 
 	const double& mIntervals, const int& timeLimitSecond, const double& gapSecond,const double& overlap2);
 	
-	void fixAndRelaxHV(std::string file, const double& nIntervals, const int& f, const double& overLap, const int& endBlock,
+	void fixAndRelaxHV(string file, const double& nIntervals, const int& f, const double& overLap, const int& endBlock,
 	const double& gapFirst, const int& outVessels, const int& timeLimitFirst, 
 	const double& mIntervals, const int& timeLimitSecond, const double& gapSecond);
 	
+
 	struct Model{
 		IloObjective obj;
 		IloModel model;
@@ -170,7 +173,8 @@ namespace mirp{
 		IloArray<IloRangeArray> priorityOA;
 		
 		//Others
-		std::vector<std::pair<int,int> > ordV;
+		vector<pair<int,int> > ordV;
+			
 			
 		Model(IloEnv& env) : obj(env), model(env), cplex(model){
 			model.add(obj);		
@@ -183,11 +187,11 @@ namespace mirp{
 		void fixAllSolution(IloEnv& env, const Instance& inst);
 		void decreaseEndBlock (IloEnv& env, Instance inst, const double& nIntervals, const int& t2S, const int& t2F); //Add to the model FO and constranints the variables between t2S and t2F
 		void reIntegralize(IloEnv& env, Instance inst, const int& t1S, const int& t1F);
-		void improvementPhase_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent);
-		void improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent);
+		void improvementPhase_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent);
+		void improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent);
 		void unFixInterval(Instance inst, const int& tS, const int& tF);
-		void improvementPhase_vessels(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, double& obj1stPhase, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time);
-		void improvementPhaseVND_vessels(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, double& obj1stPhase, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time);
+		void improvementPhase_vessels(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, double& obj1stPhase, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time);
+		void improvementPhaseVND_vessels(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, double& obj1stPhase, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time);
 		void fixVessel(IloEnv env,Instance inst, const int& v, const bool& getSolution);
 		void fixVesselPair(IloEnv env, Instance inst, const int& v,const int& v1,const bool& getSolution);
 		void fixVesselInterval(IloEnv env,Instance inst, const int& v,const int& tS, const int& tF);
@@ -204,13 +208,13 @@ namespace mirp{
 		void resetObjFunction(IloEnv& env, Instance inst);
 		void fixVesselLessInterval(IloEnv env, Instance inst, const int& v, const int& tS, const int& tF);
 		void improvementPhase_intervalVessel(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, 
-			const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time, 
+			const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, 
 			const double& timeLimit, float& elapsed_time, double& incumbent);
 		void improvementPhaseVND_intervalVessel(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, 
-			const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,float& opt_time, 
+			const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, 
 			const double& timeLimit, float& elapsed_time, double& incumbent);
 		
-		void improvementPhase_typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<std::chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);
+		void improvementPhase_typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);
 		void warmStart(IloEnv env, Instance inst, const double& timePerIter);
 		void addInventoryConstraints(Instance inst, IloEnv& env, bool& feasible);
 	};

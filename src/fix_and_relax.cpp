@@ -19,7 +19,7 @@
 #define NFixSinkArc         
 
 //~ #define FixedGAP
-#define NImprovementPhase
+//~ #define NImprovementPhase
 #define NRandomTimeInterval				//Defined: Sequential selection of time intervals in the improvementPhase_timeIntervals, otherwise random selection
 
 #define PENALIZATION 250
@@ -1852,8 +1852,8 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 									kD1_RHS += -inst.sMax_jt[i-1][l-2] + inst.sMin_jt[i-1][k-1];                                
 								}                                
 								///If considering alpha parameters, otherwise comment the above 2 lines
-								//~ kP1_RHS += - min(sum_alphaMax, inst.alp_max_j[i-1]);
-								//~ kD1_RHS += - min(sum_alphaMax, inst.alp_max_j[i-1]);
+								kP1_RHS += - min(sum_alphaMax, inst.alp_max_j[i-1]);
+								kD1_RHS += - min(sum_alphaMax, inst.alp_max_j[i-1]);
 								
 								kP2_RHS = max(0.0,ceil(kP1_RHS/inst.f_max_jt[i-1][0]));
 								kP1_RHS = max(0.0,ceil(kP1_RHS/inst.maxVesselCapacity));
@@ -3513,61 +3513,76 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		int s = T-(T/nIntervals*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
 		int sizeInterval = T/nIntervals;		 // Last t of integer block (always starting with 1 integer interval)
         int maxIt = ceil((T-sizeInterval)/p);        
-        #ifdef NRelaxation
-        for (v=1; v <= maxIt; v++){
-			timer_cplex.start();
-			//~ cout << "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
-			if(!model.cplex.solve()){
-				//~ cout << model.cplex.getStatus() << endl;
+        //For write and reading a mst file
+		size_t pos = file.find("LR");
+		string str = file.substr(pos);
+		str.erase(str.end()-1);
+		stringstream ss;
+		ss << str << "_" << inst.t << ".mst";
+        if(mIntervals == 0){
+			#ifdef NRelaxation
+			for (v=1; v <= maxIt; v++){
+				timer_cplex.start();
+				//~ cout << "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
+				if(!model.cplex.solve()){
+					//~ cout << model.cplex.getStatus() << endl;
+					opt_time += timer_cplex.total();
+					abortedRF = true;
+					obj1stPhase = 99999999;
+					goto abortRF;
+				}
 				opt_time += timer_cplex.total();
-				abortedRF = true;
-				obj1stPhase = 99999999;
-				goto abortRF;
-            }
-			opt_time += timer_cplex.total();
-			//~ cout "Solution Status " << model.cplex.getStatus() << " Value: " << model.cplex.getObjValue() << endl;
+				//~ cout "Solution Status " << model.cplex.getStatus() << " Value: " << model.cplex.getObjValue() << endl;
+				
+				t3S = ceil(T/nIntervals * (v-1) * (1-overLap/100))+1;
+				t3F = min(ceil(T/nIntervals * v * (1-overLap/100)),(double)T);
+
+				t2S = ceil(s+p*(v-1))+1;
+				t2F = min(ceil(s+p*v), (double)T); 
+
+				t1S = ceil(sizeInterval+p*(v-1)+1);
+				t1F = min(ceil(sizeInterval+p*v),(double)T); 
+
+				//~ //~ cout "Printing until time " << t2S-1 << endl;
+				//~ model.printSolution(env, inst, t2S-1);
+
+				model.modifyModel(env, inst, nIntervals, t3S, t3F, t2S, t2F, t1S, t1F, 
+					validIneq, addConstr, tightenInvConstr, proportionalAlpha, tightenFlow);
+				//~ model.cplex.exportModel("mip_R&F.lp");
+				
+				#ifndef FixedGAP
+				double newGap = max(0.001, (gapFirst - gapFirst/maxIt*v)/100);
+				//~ //~ cout "New GAP " << newGap*100 << " % \n \n";
+				model.cplex.setParam(IloCplex::EpGap, newGap);            
+				#endif
+			}
+			#endif
 			
-			t3S = ceil(T/nIntervals * (v-1) * (1-overLap/100))+1;
-			t3F = min(ceil(T/nIntervals * v * (1-overLap/100)),(double)T);
+			//Last iteration (after fixing the penultimate interval)
+			timer_cplex.start();
+			model.cplex.solve();
+			opt_time += timer_cplex.total();
+			time1stPhase = timer_1stPhase.total();
+			global_time += timer_global.total();
+			timer_global.start();
+			
+			obj1stPhase = model.cplex.getObjValue();
+			abortRF:
+			double incumbent = obj1stPhase;
+			//~ //~ cout "Solution Status " << model.cplex.getStatus() << " Value: " << obj1stPhase << endl;
+			
+			//~ model.printSolution(env, inst, T);
 
-			t2S = ceil(s+p*(v-1))+1;
-			t2F = min(ceil(s+p*v), (double)T); 
-
-			t1S = ceil(sizeInterval+p*(v-1)+1);
-			t1F = min(ceil(sizeInterval+p*v),(double)T); 
-
-            //~ //~ cout "Printing until time " << t2S-1 << endl;
-            //~ model.printSolution(env, inst, t2S-1);
-
-			model.modifyModel(env, inst, nIntervals, t3S, t3F, t2S, t2F, t1S, t1F, 
-				validIneq, addConstr, tightenInvConstr, proportionalAlpha, tightenFlow);
-            //~ model.cplex.exportModel("mip_R&F.lp");
-            
-            #ifndef FixedGAP
-            double newGap = max(0.001, (gapFirst - gapFirst/maxIt*v)/100);
-            //~ //~ cout "New GAP " << newGap*100 << " % \n \n";
-            model.cplex.setParam(IloCplex::EpGap, newGap);            
-            #endif
-		}
-		#endif
-		
-		//Last iteration (after fixing the penultimate interval)
-		timer_cplex.start();
-		model.cplex.solve();
-		opt_time += timer_cplex.total();
-		time1stPhase = timer_1stPhase.total();
-		global_time += timer_global.total();
-		timer_global.start();
-        
-		obj1stPhase = model.cplex.getObjValue();
-		abortRF:
-		double incumbent = obj1stPhase;
-		//~ //~ cout "Solution Status " << model.cplex.getStatus() << " Value: " << obj1stPhase << endl;
-		
-		//~ model.printSolution(env, inst, T);
-		
-
+			model.cplex.writeMIPStarts(ss.str().c_str());
+		}else{		
+			cout << "Reading MST file...\n";
+			model.cplex.readMIPStart(ss.str().c_str());
+			model.cplex.setParam(IloCplex::TiLim, 1);        
+			model.cplex.solve();        
+        }
         #ifndef NImprovementPhase
+		
+		double incumbent = model.cplex.getObjValue();
 		//~ //~ cout "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
         model.fixAllSolution(env, inst);
 		
@@ -3654,6 +3669,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 				//~ isInfeasible << "\t" <<
 				//~ endl;
 		cout << obj1stPhase << endl;
+		//~ cout << obj2ndPhase << endl;
         #endif
         
         #ifndef NRelaxation        

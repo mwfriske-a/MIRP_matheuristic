@@ -10,7 +10,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <unordered_map>
+#include <algorithm>
 #include <ilcplex/ilocplex.h>
 #include "../include/util.h"
 #include "../include/model.h"
@@ -21,7 +21,7 @@
 //~ #define NTravelEmpty
 //~ #define NBerthLimit
 #define NBranching
-//~ #define NRelaxation
+#define NRelaxation
 #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
 //~ #define NKnapsackInequalities
 
@@ -789,7 +789,7 @@ void Model::buildModel(IloEnv& env, Instance inst){
 }
 
 void Model::printSolution(IloEnv env, Instance inst, const int& tF){
-	int i,j,t,v,a;
+	unsigned int i,j,t,v,a;
 	int J = inst.numTotalPorts;
 	int T = inst.t + 1;			//Init time-periods in 1
 	int V = inst.speed.getSize(); //# of vessels
@@ -801,13 +801,24 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 	xValue = IloArray<IloArray<IloArray<IloNumArray> > >(env,V) ;
 	zValue = IloArray<IloArray<IloNumArray> >(env,V);
 	wValue = IloArray<IloArray<IloNumArray> >(env,V);
+	#ifndef WaitAfterOperate
 	oAValue = IloArray<IloArray<IloNumArray> >(env,V);
 	oBValue = IloArray<IloArray<IloNumArray> > (env,V);
+	#endif
+	#ifdef WaitAfterOperate
+	wBValue = IloArray<IloArray<IloNumArray> >(env,V);
+	#endif
+	
 	//Store fractional variables
 	fValue = IloArray<IloArray<IloNumArray> >(env,V);
 	fXValue = IloArray<IloArray<IloArray<IloNumArray> > >(env,V);
 	foAValue = IloArray<IloArray<IloNumArray> > (env,V);
+	#ifndef WaitAfterOperate
 	foBValue = IloArray<IloArray<IloNumArray> >(env,V);
+	#endif
+	#ifdef WaitAfterOperate
+	fWBValue = IloArray<IloArray<IloNumArray> >(env,V);
+	#endif
 	fWValue = IloArray<IloArray<IloNumArray> >(env,V);
 	sPValue = IloArray<IloNumArray>(env,N-1);
 	alphaValue = IloArray<IloNumArray>(env,N-1);
@@ -816,25 +827,37 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 		xValue[v] = IloArray<IloArray<IloNumArray>>(env, N);
 		zValue[v] = IloArray<IloNumArray>(env,N-1);
 		wValue[v] = IloArray<IloNumArray>(env,N-1);
-		oAValue[v] = IloArray<IloNumArray>(env,N-1);
+		#ifndef WaitAfterOperate
+		oAValue[v] = IloArray<IloNumArray>(env,N-1);		
 		oBValue[v] = IloArray<IloNumArray>(env,N-1);
-		
+		foBValue[v] = IloArray<IloNumArray>(env,N-1);
+		#endif
+		#ifdef WaitAfterOperate
+		wBValue[v] = IloArray<IloNumArray>(env,N-1);
+		fWBValue[v] = IloArray<IloNumArray>(env,N-1);
+		#endif
 		fXValue[v] = IloArray<IloArray<IloNumArray>>(env, N);
 		fValue[v] = IloArray<IloNumArray>(env,N-1);
-		foAValue[v] = IloArray<IloNumArray>(env,N-1);
-		foBValue[v] = IloArray<IloNumArray>(env,N-1);
+		foAValue[v] = IloArray<IloNumArray>(env,N-1);		
 		fWValue[v] = IloArray<IloNumArray>(env,N-1);		
 		
 		for (i=0;i<N;i++){
 			if(i > 0 && i < N-1){ //Not consider sink node
 				zValue[v][i] = IloNumArray(env,T);
 				wValue[v][i] = IloNumArray(env,T);
+				#ifndef WaitAfterOperate
 				oAValue[v][i] = IloNumArray(env,T);
 				oBValue[v][i] = IloNumArray(env,T);
+				foBValue[v][i] = IloNumArray(env,T);
+				#endif
+				#ifdef WaitAfterOperate
+				wBValue[v][i] = IloNumArray(env,T);
+				fWBValue[v][i] = IloNumArray(env,T);
+				#endif
 				
 				fValue[v][i] = IloNumArray(env,T);
 				foAValue[v][i] = IloNumArray(env,T);
-				foBValue[v][i] = IloNumArray(env,T);
+				
 				fWValue[v][i] = IloNumArray(env,T);
 				
 				for(t=1;t<T;t++){
@@ -853,8 +876,14 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 						foAValue[v][i][t] = cplex.getValue(fOA[v][i][t]);						
 						if(t<T-1){ //Variables not associated with last time index
 							wValue[v][i][t] = cplex.getValue(w[v][i][t]);
+							#ifndef WaitAfterOperate
 							oBValue[v][i][t] = cplex.getValue(oB[v][i][t]);							
 							foBValue[v][i][t] = cplex.getValue(fOB[v][i][t]);	
+							#endif
+							#ifdef WaitAfterOperate
+							wBValue[v][i][t] = cplex.getValue(wB[v][i][t]);							
+							fWBValue[v][i][t] = cplex.getValue(fWB[v][i][t]);	
+							#endif
 							fWValue[v][i][t] = cplex.getValue(fW[v][i][t]);						
 						}
 					}
@@ -889,11 +918,18 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 			if(t>0){
 				alphaValue[i][t] = cplex.getValue(alpha[i][t]);
 				if (alphaValue[i][t] >= 0.01){
-					costSpot += inst.p_jt[i-1][t-1];
+					costSpot += inst.p_jt[i-1][t-1]*alphaValue[i][t];
 					cout << " Alpha: " << alphaValue[i][t];
 				}
+				#ifndef NBetas
+				
+				#endif
+				
+				#ifndef NThetas
+				
+				#endif
 			}
-			if(sPValue[i][t] > inst.f_max_jt[i-1][0] || sPValue[i][t] < inst.f_min_jt[i-1][0])
+			if(sPValue[i][t] > inst.sMax_jt[i-1][0] || sPValue[i][t] < inst.sMin_jt[i-1][0])
 				cout << " - Inventory out of bounds!";
 			cout << endl;
 				
@@ -901,39 +937,41 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 	}
 	
 	//Printing solution
-	cout << "SOLUTION LOG: \n";
+	cout << "SOLUTION LOG: \n";	
 	for(v=0;v<V;v++){
+		i = inst.initialPort[v]+1;
+		t = inst.firstTimeAv[v]+1;
 		cout << "Vessel " << v << " route: " << endl;
-		for(i=0;i<N-1;i++){			
-			for(j=0;j<N;j++){	
-				for(t=0;t<T;t++){
-					if (i==0 && xValue[v][i][j][t]>=0.1) //Starting
-						cout << "Depart at (" << i << "," << t << ") -> (" << j << "," << t+inst.firstTimeAv[v]+1 << ") with load: " << fXValue[v][i][j][t] << endl;
-					else if(xValue[v][i][j][t] >= 0.1 && j < N-1) //Travelling
-						cout << "Travel from (" << i << "," << t << ") -> (" << j << "," << t+inst.travelTime[v][i-1][j-1] << ") with load: " << fXValue[v][i][j][t] << " Cost: " << arcCost[v][i][j][t] << endl;
-					else if (j == N-1 && xValue[v][i][j][t] >= 0.1) //Sink arcs
-						cout << "Exit system at (" << i << "," << t << ") with load: " << fXValue[v][i][j][t] << " Cost: " << arcCost[v][i][j][t] << endl;
-				}
+		cout << "Starts at \n(" << i << "," << t << ") Load: " << fXValue[v][0][i][0];
+		checkOperation:
+		if(zValue[v][i][t] >= 0.1){							
+			if(inst.delta[i-1] == 1){
+				cout << " - Loaded " << fValue[v][i][t]; 
+			}else{
+				cout << " - Discharged " << fValue[v][i][t];
 			}
-			if(i>0){
-				for(t=1;t<T;t++){
-					if(hasEnteringArc1st[v][i][t]){
-						if(t<T-1 && wValue[v][i][t] >= 0.1)						
-							cout << "Waiting in (" << i << "," << t << ") with load: " << fWValue[v][i][t] << endl;
-						if(zValue[v][i][t] >= 0.1){
-							if (t==1)
-								cout << "Operate at (" << i << "," << t << ") - oA= " << oAValue[v][i][t] << "(" << foAValue[v][i][t] << ") - f= " << fValue[v][i][t] << endl;
-							else{
-								cout << "Operate at (" << i << "," << t << ") - oA= " << oAValue[v][i][t] << "(" << foAValue[v][i][t] << ") oB= " << oBValue[v][i][t-1] << "(" << foBValue[v][i][t-1] << 
-								")- f= " << fValue[v][i][t] << endl;
-							}
-						}else{
-							if (fValue[v][i][t] > 0.01)
-								cout << "Operated but not in node (" << i << "," << t << ")_" << v << ": "  << fValue[v][i][t] << endl;
-							assert(fValue[v][i][t] <= 0.01);
-						}
-					}
-				}
+		}
+		cout << endl;
+		if(t<T-1 && (wValue[v][i][t] >= 0.1 ||
+			#ifdef WaitAfterOperate
+			wBValue[v][i][t] >= 0.1
+			#endif 
+		)){
+			t++;						
+			cout << "(" << i << "," << t << ") load: fW " << fWValue[v][i][t-1] 							
+			#ifdef WaitAfterOperate
+			<< "/ fWB " << fWBValue[v][i][t-1];
+			#endif											
+			goto checkOperation;
+		}
+		for(j=0;j<N;j++){				
+			if(xValue[v][i][j][t] >= 0.1 && j < N-1){ //Travelling				
+				cout << "(" << j << "," << t+inst.travelTime[v][i-1][j-1] << ") load: " << fXValue[v][i][j][t];
+				t = t+inst.travelTime[v][i-1][j-1];
+				i = j;
+				goto checkOperation;
+			}else if(xValue[v][i][j][t] >= 0.1 && j == N-1){
+				cout << "Exit at (" << i << "," << t << ") with load: " << fXValue[v][i][j][t] << " Cost: " << arcCost[v][i][j][t] << endl;
 			}
 		}
 	}
@@ -977,7 +1015,7 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	cplex.setParam(IloCplex::WorkDir, "workDir/");
 	cplex.setParam(IloCplex::ClockType, 2);
 	cplex.setParam(IloCplex::TiLim, timeLimit);
-	cplex.setParam(IloCplex::MIPEmphasis, 1); // 1 - Feasibility
+	//~ cplex.setParam(IloCplex::MIPEmphasis, 1); // 1 - Feasibility
 	
 	//~ cplex.setParam(IloCplex::NodeLim, 1);
 	
@@ -991,6 +1029,9 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 		cplex.setPriority(y[j],1);
 	}	
 	#endif
+	//Level of writting MIPStart solutions - 1 (all variables), 2 only discrete vars
+	cplex.setParam(IloCplex::WriteLevel, 1); 
+	//~ cplex.setParam(IloCplex::RepairTries, -1);
 }
 /*
  * After solved, verify which variables s_it were infeasible and add the corresponding constraint
