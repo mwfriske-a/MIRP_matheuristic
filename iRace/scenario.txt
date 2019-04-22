@@ -64,13 +64,13 @@ targetRunner = "./target-runner"
 ## Maximum number of runs (invocations of targetRunner) that will be
 ## performed. It determines the maximum budget of experiments for the
 ## tuning.
-maxExperiments = 15552 # For T = 45 and 6 training instances
+#maxExperiments = 15552 # For T = 45 and 6 training instances
 #maxExperiments = 21670 # For T = 60 and 6 training instances
 
 ## Maximum total execution time in seconds for the executions of
 ## targetRunner. targetRunner must return two values: cost and time.
-# 3 days
-# maxTime = 259200 
+# 5 days
+maxTime = 432000 
 
 ## Fraction (smaller than 1) of the budget used to estimate the mean
 ## computation time of a configuration. Only used when maxTime > 0
