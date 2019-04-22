@@ -1,0 +1,7 @@
+name                 Vessel_0 
+index                0 
+vesselClass          0 
+type                 Term 
+initialInventory     0
+initialPort          LoadingRegion_0_Port_0 
+firstTimeAvailable   0 

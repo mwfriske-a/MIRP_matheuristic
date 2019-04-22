@@ -1,0 +1,7 @@
+----- FullTravelTimeMatrixForClass -----
+Vessel_Class_0
+    0  1 
+ 0  0  5  
+ 1  5  0  
+FullTravelTimeMatrixForClass(vc,i,j) = travel time (number of periods) for a vessel in vessel class vc to travel from port i to port j.
+
