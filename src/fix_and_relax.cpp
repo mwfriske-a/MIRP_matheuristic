@@ -22,7 +22,7 @@
 //~ #define NImprovementPhase
 #define NRandomTimeInterval				//Defined: Sequential selection of time intervals in the improvementPhase_timeIntervals, otherwise random selection
 
-#define PENALIZATION 250
+#define PENALIZATION 1000
 
 ILOSTLBEGIN
 
@@ -3483,6 +3483,8 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 	float elapsed_time_it {0};
 	bool abortedRF = false;
 	
+	double obj1stPhase = 0, obj2ndPhase = 0, time1stPhase=0, time2ndPhase=0, intPart;
+	
 	///Read input files
 	IloEnv env;
 	
@@ -3498,8 +3500,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		int v, j, t, t1S, t1F, t2S, t2F, t3S, t3F;
 		int J = inst.numTotalPorts;
 		int T = inst.t;
-		int V = inst.speed.getSize(); //# of vessels
-        double obj1stPhase = 0, obj2ndPhase = 0, time1stPhase=0, time2ndPhase=0, intPart;
+		int V = inst.speed.getSize(); //# of vessels        
 
 		/// NEW MODEL
 		timer_1stPhase.start();
@@ -3573,16 +3574,16 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			
 			//~ model.printSolution(env, inst, T);
 
-			model.cplex.writeMIPStarts(ss.str().c_str());
+			//~ model.cplex.writeMIPStarts(ss.str().c_str());
 		}else{		
-			cout << "Reading MST file...\n";
+			//~ cout << "Reading MST file...\n";
 			model.cplex.readMIPStart(ss.str().c_str());
 			model.cplex.setParam(IloCplex::TiLim, 1);        
-			model.cplex.solve();        
+			model.cplex.solve(); 
+			obj1stPhase = model.cplex.getObjValue();       
         }
-        #ifndef NImprovementPhase
-		
-		double incumbent = model.cplex.getObjValue();
+        double incumbent = obj1stPhase;
+        #ifndef NImprovementPhase	
 		//~ //~ cout "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
         model.fixAllSolution(env, inst);
 		
@@ -3591,16 +3592,16 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
         //~ model.improvementPhase_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
         //~ timeLimit/3, elapsed_time, incumbent);
         
-        model.improvementPhaseVND_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        timeLimit, elapsed_time, incumbent);
+       // model.improvementPhaseVND_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+        //timeLimit, elapsed_time, incumbent);
         
         tLimit = (timeLimit - elapsed_time/1000);//2;        
         //~ //~ cout "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;        
 		
         //~ model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
         //~ tLimit, elapsed_time, incumbent); 
-        //~ model.improvementPhaseVND_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        //~ timeLimit, elapsed_time, incumbent);
+        model.improvementPhaseVND_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+        timeLimit, elapsed_time, incumbent);
         
         //~ model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
         //~ model.improvementPhaseVND_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
@@ -3657,7 +3658,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		#endif
 		
         /// Data (header in the main method)
-        //~ cout file << "\t" <<
+        //~ cout << ss.str() << "\t" <<
 				//~ maxIt << "\t" << 
 				//~ time1stPhase/1000 << "\t" <<
 				//~ obj1stPhase << "\t" << 
@@ -3668,8 +3669,9 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 				//~ abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
 				//~ isInfeasible << "\t" <<
 				//~ endl;
-		cout << obj1stPhase << endl;
-		//~ cout << obj2ndPhase << endl;
+		///For iRace tests: <obj,time>
+		cout << obj1stPhase << " " << time1stPhase/1000 << endl;
+		
         #endif
         
         #ifndef NRelaxation        
@@ -3681,11 +3683,12 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
         #endif
 	}catch (IloException& e) {
 		//~ cerr << "Concert exception caught: " << e << endl;		
-		cerr << 99999999 << endl;		
+		///For iRace tests: <obj, time>
+		cerr << 99999999 << " " << time1stPhase/1000 << endl;		
 		e.end();
 	}
 	catch (...) {
-		//~ cerr << "Unknown exception caught" << endl;
+		cerr << "Unknown exception caught" << endl;
 	}
 	env.end();
 }

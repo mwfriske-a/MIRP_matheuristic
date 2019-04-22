@@ -9,6 +9,7 @@ usuage is
 -d : 1 if use tightening of inventory contraints, 0 otherwise (only when e > 0) 
 -k : 1 if use of proportional alphaMaxJ, 0 otherwise (only when e > 0) 
 -z : 1 if simplify instance, 0 otherwise 
+-b : 1 if bounds on flow fOB(fWB) and fX are tighten
 For -v = {2,3} (Fix and relax algorithm):
  -n : Number of intervals in the first phase (-v =2) 
  -g : Initial GAP for solving the first phase (-v = 2,3) 
