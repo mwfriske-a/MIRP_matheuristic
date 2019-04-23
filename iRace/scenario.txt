@@ -103,7 +103,7 @@ maxTime = 432000
 
 ## Number of instances evaluated before the first elimination test. It
 ## must be a multiple of eachTest.
-# firstTest = 5
+firstTest = 6
 
 ## Number of instances evaluated between elimination tests.
 # eachTest = 1
@@ -151,7 +151,7 @@ parallel = 5
 
 ## Enable/disable the soft restart strategy that avoids premature
 ## convergence of the probabilistic model.
-# softRestart = 1
+softRestart = 1
 
 ## Soft restart threshold value for numerical parameters. If NA, NULL or
 ## "", it is computed as 10^-digits.
