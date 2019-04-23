@@ -19,7 +19,7 @@
 #define NFixSinkArc         
 
 //~ #define FixedGAP
-//~ #define NImprovementPhase
+#define NImprovementPhase
 #define NRandomTimeInterval				//Defined: Sequential selection of time intervals in the improvementPhase_timeIntervals, otherwise random selection
 
 #define PENALIZATION 1000
@@ -3502,8 +3502,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		int T = inst.t;
 		int V = inst.speed.getSize(); //# of vessels        
 
-		/// NEW MODEL
-		timer_1stPhase.start();
+		/// NEW MODEL		
 		Model model(env);
 		model.buildFixAndRelaxModel(env,inst, nIntervals, endBlock, validIneq, addConstr, tightenInvConstr, 
 			proportionalAlpha, reduceArcs, tightenFlow);
@@ -3520,6 +3519,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		str.erase(str.end()-1);
 		stringstream ss;
 		ss << str << "_" << inst.t << ".mst";
+		timer_1stPhase.start();
         if(mIntervals == 0){
 			#ifdef NRelaxation
 			for (v=1; v <= maxIt; v++){
@@ -3528,6 +3528,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 				if(!model.cplex.solve()){
 					//~ cout << model.cplex.getStatus() << endl;
 					opt_time += timer_cplex.total();
+					time1stPhase += timer_1stPhase.total();
 					abortedRF = true;
 					obj1stPhase = 99999999;
 					goto abortRF;
