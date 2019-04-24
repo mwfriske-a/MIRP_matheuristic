@@ -3682,10 +3682,10 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 				obj1stPhase << "\t" << 				
 				endl;
         #endif
-	}catch (IloException& e) {
-		//~ cerr << "Concert exception caught: " << e << endl;		
+	}catch (IloException& e) {		
 		///For iRace tests: <obj, time>
-		cerr << 99999999 << " " << time1stPhase/1000 << endl;		
+		cout << 99999999 << " " << time1stPhase/1000 << endl;		
+		cerr << "Concert exception caught: " << e << endl;		
 		e.end();
 	}
 	catch (...) {
