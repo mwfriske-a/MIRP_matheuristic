@@ -62,7 +62,7 @@ $EXE ${FIXED_PARAMS} -p $INSTANCE ${CONFIG_PARAMS} 1> ${STDOUT} 2> ${STDERR}
 if [ -s "${STDOUT}" ]; then
     COST=$(tail -n 1 ${STDOUT} | grep -e '^[[:space:]]*[+-]\?[0-9]' | cut -f1)
     echo "$COST"
-    rm -f "${STDOUT}" "${STDERR}"
+    #~ rm -f "${STDOUT}" "${STDERR}"
     exit 0
 else
     error "${STDOUT}: No such file or directory"
