@@ -1032,7 +1032,7 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//Level of writting MIPStart solutions - 1 (all variables), 2 only discrete vars
 	cplex.setParam(IloCplex::WriteLevel, 1); 
 	//~ cplex.setParam(IloCplex::RepairTries, 10);
-	cplex.setParam(IloCplex::AdvInd, 0);   //0 - No use MIP-Start solution (for the R\&F iterations)
+	//~ cplex.setParam(IloCplex::AdvInd, 0);   //0 - No use MIP-Start solution (for the R\&F iterations)
 }
 /*
  * After solved, verify which variables s_it were infeasible and add the corresponding constraint

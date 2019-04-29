@@ -1,0 +1,8 @@
+----- FullDistanceMatrix -----
+          0        1        2        3 
+ 0     0.00  5792.83  5730.94  5663.71 
+ 1  5792.83     0.00   326.10   338.92 
+ 2  5730.94   326.10     0.00    67.42 
+ 3  5663.71   338.92    67.42     0.00 
+FullDistanceMatrix(i,j) = distance (km) from port i to port j.
+
