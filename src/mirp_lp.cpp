@@ -23,7 +23,7 @@
 #define NBranching
 #define NRelaxation
 #define WaitAfterOperate 				//If defined, allows a vessel to wait after operates at a port.
-//~ #define NKnapsackInequalities
+#define NKnapsackInequalities
 
 ILOSTLBEGIN
 
@@ -950,6 +950,11 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 			}else{
 				cout << " - Discharged " << fValue[v][i][t];
 			}
+			if(fValue[v][i][t] > inst.f_max_jt[i-1][0]){
+				cout << " ERRO: > F^Max_i ";
+			}else if (fValue[v][i][t] < inst.f_min_jt[i-1][0]){
+				cout << " ERRO: < F^Min_i ";
+			}
 		}
 		cout << endl;
 		if(t<T-1 && (wValue[v][i][t] >= 0.1 ||
@@ -985,7 +990,7 @@ void Model::printSolution(IloEnv env, Instance inst, const int& tF){
 void Model::setParameters(IloEnv& env, const double& timeLimit, const double& gap=1e-04){
 	//~ cplex.exportModel("mip.lp");
 	//~ env.setNormalizer(IloFalse);
-	//Pressolve
+	//Pressolve - turn off
 	//~ cplex.setParam(IloCplex::PreInd,0);
 	//~ cplex.setParam(IloCplex::RelaxPreInd,0);
 	//~ cplex.setParam(IloCplex::PreslvNd,-1);
@@ -1003,8 +1008,8 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//~ cplex.setParam(IloCplex::MCFCuts, 2);		//Max 2
 	//~ cplex.setParam(IloCplex::ZeroHalfCuts, 2);	//Max 2
 	
-	cplex.setOut(env.getNullStream());
-	cplex.setWarning(env.getNullStream());
+	//~ cplex.setOut(env.getNullStream());
+	//~ cplex.setWarning(env.getNullStream());
 	cplex.setParam(IloCplex::Threads, 1);
 	//~ cplex.setParam(IloCplex::ConflictDisplay, 2); 
 	//~ cplex.setParam(IloCplex::MIPDisplay, 1); 
@@ -1032,7 +1037,7 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//Level of writting MIPStart solutions - 1 (all variables), 2 only discrete vars
 	cplex.setParam(IloCplex::WriteLevel, 1); 
 	//~ cplex.setParam(IloCplex::RepairTries, 10);
-	//~ cplex.setParam(IloCplex::AdvInd, 0);   //0 - No use MIP-Start solution (for the R\&F iterations)
+	cplex.setParam(IloCplex::AdvInd, 0);   //0 - No use MIP-Start solution (for the R\&F iterations)
 }
 /*
  * After solved, verify which variables s_it were infeasible and add the corresponding constraint
