@@ -820,7 +820,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					//~ //~ //~ cout it << " [" << l << "," << k << "]\n";
 				for(v=0;v<V;v++){
 					#ifdef WaitAfterOperate
-					if(k<tOEB){
+					if(k<tOEB && hasEnteringArc1st[v][i][k]){
 						expr_kP1_LHS += wB[v][i][k];
 					}
 					if(l>1 && hasEnteringArc1st[v][i][l-1]==1)
@@ -974,8 +974,8 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                     expr_sumF += f[v][i][t];
                     expr_sumO += z[v][i][t];                    
                     #endif
+					expr_invBalancePort += -f[v][i][t];
 				}
-				expr_invBalancePort += -f[v][i][t];
 			}
 			if(!emptyExpr){ //Only if there are some Z variable in the expr
 				berthLimit[i][t] = IloRange(env,-IloInfinity, expr_berth, inst.b_j[i-1], ss.str().c_str());
@@ -1142,16 +1142,18 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                                     }
                                 }
 							}else{ // when j is the sink node
-								if(inst.typePort[i-1] == 0){
-									ss << "travelAtCap_(" << i << ",snk)_" << t << "," << v;
-									travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);	
-									travelAtCapacity[v][i][j][t].setName(ss.str().c_str());
-                                    model.add(travelAtCapacity[v][i][j][t]);
-								}else if (inst.typePort[i-1] == 1){ 
-									ss1 << "travelEmpty_(" << i << ",snk)_" << t << "," << v;
-									travelEmpty[v][i][j][t].setExpr(inst.q_v[v]*x[v][i][j][t] + fX[v][i][j][t]);
-									travelEmpty[v][i][j][t].setName(ss1.str().c_str());
-                                    model.add(travelEmpty[v][i][j][t]);
+								if(hasArc[v][i][j][t]==1){
+									if(inst.typePort[i-1] == 0){
+										ss << "travelAtCap_(" << i << ",snk)_" << t << "," << v;
+										travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);	
+										travelAtCapacity[v][i][j][t].setName(ss.str().c_str());
+										model.add(travelAtCapacity[v][i][j][t]);
+									}else if (inst.typePort[i-1] == 1){ 
+										ss1 << "travelEmpty_(" << i << ",snk)_" << t << "," << v;
+										travelEmpty[v][i][j][t].setExpr(inst.q_v[v]*x[v][i][j][t] + fX[v][i][j][t]);
+										travelEmpty[v][i][j][t].setName(ss1.str().c_str());
+										model.add(travelEmpty[v][i][j][t]);
+									}
 								}
 							}
 						}
@@ -1323,102 +1325,108 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					secondLevelFlow[v][i][t].setExpr(expr_2ndFlow);
 					
 					firstLevelBalance[v][i][t].setName(ss.str().c_str());
-					model.add(firstLevelBalance[v][i][t]);
+					if(hasEnteringArc1st[v][i][t]==1){
+						model.add(firstLevelBalance[v][i][t]);
+											
+						secondLevelBalance[v][i][t].setName(ss1.str().c_str());
+						model.add(secondLevelBalance[v][i][t]);
+					}
 					
-					secondLevelBalance[v][i][t].setName(ss1.str().c_str());
-					model.add(secondLevelBalance[v][i][t]);
+					
 					
 					#ifndef WaitAfterOperate                    
 					linkBalance[v][i][t].setName(ss2.str().c_str());
 					model.add(linkBalance[v][i][t]);
 					#endif
 					
-					firstLevelFlow[v][i][t].setName(ss3.str().c_str());
-					model.add(firstLevelFlow[v][i][t]);
+					if(hasEnteringArc1st[v][i][t]==1){
 					
-					secondLevelFlow[v][i][t].setName(ss4.str().c_str());
-					model.add(secondLevelFlow[v][i][t]);
-
-					ss5 << "fjmin_(" << i << "," << t << ")," << v;
-					ss6 << "fjmax_(" << i << "," << t << ")," << v;
-					IloNum minfMax = min(inst.f_max_jt[i-1][t-1], inst.q_v[v]);
-					operationLowerLimit[v][i][t] = IloRange(env, 0, f[v][i][t] - inst.f_min_jt[i-1][t-1]*z[v][i][t] , IloInfinity, ss5.str().c_str());
-					model.add(operationLowerLimit[v][i][t]);
-					
-					operationUpperLimit[v][i][t] = IloRange(env, -IloInfinity, f[v][i][t] - minfMax*z[v][i][t],	0, ss6.str().c_str());
-					model.add(operationUpperLimit[v][i][t]);
-					
-					ss7 << "flowLimitOA_"<<v<<","<<i<<","<<t;
-					stringstream ss7_1;
-                    ss7_1 << "flowMinLimitOA_"<<v<<","<<i<<","<<t;
-					#ifndef WaitAfterOperate
-					flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-oA[v][i][t]*inst.q_v[v], 0, ss7.str().c_str());
-                    if(tightenFlow){
-						if(inst.typePort[i-1] == 1){ //Minimum flow in discharging ports
-							flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, oA[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
-							model.add(flowMinCapacityOA[v][i][t]);
-						}else{ //Change upper bound for loading ports
-							flowCapacityOA.setExpr(fOA[v][i][t] - oA[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
-						}
-					}
-					#endif
-					#ifdef WaitAfterOperate
-					flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-z[v][i][t]*inst.q_v[v], 0, ss7.str().c_str());
-                    if(tightenFlow){
-						if(inst.typePort[i-1] == 1){ //Minimum flow in discharging port
-							flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, z[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
-							model.add(flowMinCapacityOA[v][i][t]);
-						}else{ //Change upper bound for loading ports
-							flowCapacityOA[v][i][t].setExpr(fOA[v][i][t] - z[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
-						}
-					}                    
-					#endif
-					model.add(flowCapacityOA[v][i][t]);
-					
-					if(t<tOEB){ //Constraints with no last time index
-						#ifndef WaitAfterOperate
-						ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
-                        stringstream ss8_1;
-                        ss8 << "flowMinLimitOB_"<<v<<","<<i<<","<<t;
-						flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-oB[v][i][t](inst.q_v[v]), 0, ss8.str().c_str());
-						model.add(flowCapacityOB[v][i][t]);
-						if(tightenFlow){
-							//Equal for discharging and loading ports
-							flowMinCapacityOB[v][i][t] = IloRange(env, -IloInfinity, oB[v][i][t]*inst.f_min_jt[i-1][t-1] - fOB[v][i][t], 0, ss8_1.str().c_str());
-							model.add(flowMinCapacityOB[v][i][t]);
-							flowCapacityOB[v][i][t].setExpr(oB[v][i][t](inst.q_v[v]-inst.f_min_jt[i-1][t-1]) - fOB[v][i][t]);
-						}
-						#endif
-
-						#ifdef WaitAfterOperate
-						ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
-                        stringstream ss10_1;
-                        ss10_1 << "flowMinLimitWB_"<<v<<","<<i<<","<<t;
+						firstLevelFlow[v][i][t].setName(ss3.str().c_str());
+						model.add(firstLevelFlow[v][i][t]);
 						
-						flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
-						model.add(flowCapacityWB[v][i][t]);
-                        if(tightenFlow){
-							//Equal for discharging and loading ports
-							flowMinCapacityWB[v][i][t] = IloRange(env, -IloInfinity, wB[v][i][t]*inst.f_min_jt[i-1][t-1]-fWB[v][i][t], 0, ss10_1.str().c_str());
-							model.add(flowMinCapacityWB[v][i][t]);
-							flowCapacityWB[v][i][t].setExpr(wB[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1])-fWB[v][i][t]);							
+						secondLevelFlow[v][i][t].setName(ss4.str().c_str());
+						model.add(secondLevelFlow[v][i][t]);
+
+						ss5 << "fjmin_(" << i << "," << t << ")," << v;
+						ss6 << "fjmax_(" << i << "," << t << ")," << v;
+						IloNum minfMax = min(inst.f_max_jt[i-1][t-1], inst.q_v[v]);
+						operationLowerLimit[v][i][t] = IloRange(env, 0, f[v][i][t] - inst.f_min_jt[i-1][t-1]*z[v][i][t] , IloInfinity, ss5.str().c_str());
+						model.add(operationLowerLimit[v][i][t]);
+						
+						operationUpperLimit[v][i][t] = IloRange(env, -IloInfinity, f[v][i][t] - minfMax*z[v][i][t],	0, ss6.str().c_str());
+						model.add(operationUpperLimit[v][i][t]);
+						
+						ss7 << "flowLimitOA_"<<v<<","<<i<<","<<t;
+						stringstream ss7_1;
+						ss7_1 << "flowMinLimitOA_"<<v<<","<<i<<","<<t;
+						#ifndef WaitAfterOperate
+						flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-oA[v][i][t]*inst.q_v[v], 0, ss7.str().c_str());
+						if(tightenFlow){
+							if(inst.typePort[i-1] == 1){ //Minimum flow in discharging ports
+								flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, oA[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
+								model.add(flowMinCapacityOA[v][i][t]);
+							}else{ //Change upper bound for loading ports
+								flowCapacityOA.setExpr(fOA[v][i][t] - oA[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+							}
 						}
 						#endif
-						ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
-                        stringstream ss9_1;
-                        ss9_1 << "flowLimitW_"<<v<<","<<i<<","<<t;
-						flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());
-						model.add(flowCapacityW[v][i][t]);
-                        if(tightenFlow){
-							if(inst.typePort[i-1] == 1){ //Lower bound on flow for discharging ports
-								flowMinCapacityW[v][i][t] = IloRange(env, -IloInfinity, w[v][i][t]*inst.f_min_jt[i-1][t-1]-fW[v][i][t], 0, ss9_1.str().c_str());
-								model.add(flowMinCapacityW[v][i][t]);
-							}else{ //Upper bound on loading ports
-								flowCapacityW[v][i][t].setExpr(fW[v][i][t]-w[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+						#ifdef WaitAfterOperate
+						flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-z[v][i][t]*inst.q_v[v], 0, ss7.str().c_str());
+						if(tightenFlow){
+							if(inst.typePort[i-1] == 1){ //Minimum flow in discharging port
+								flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, z[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
+								model.add(flowMinCapacityOA[v][i][t]);
+							}else{ //Change upper bound for loading ports
+								flowCapacityOA[v][i][t].setExpr(fOA[v][i][t] - z[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
 							}
-                        }
-					}
-                    
+						}                    
+						#endif
+						model.add(flowCapacityOA[v][i][t]);
+						
+						if(t<tOEB && hasEnteringArc1st[v][i][t]==1){ //Constraints with no last time index
+							#ifndef WaitAfterOperate
+							ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
+							stringstream ss8_1;
+							ss8 << "flowMinLimitOB_"<<v<<","<<i<<","<<t;
+							flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-oB[v][i][t](inst.q_v[v]), 0, ss8.str().c_str());
+							model.add(flowCapacityOB[v][i][t]);
+							if(tightenFlow){
+								//Equal for discharging and loading ports
+								flowMinCapacityOB[v][i][t] = IloRange(env, -IloInfinity, oB[v][i][t]*inst.f_min_jt[i-1][t-1] - fOB[v][i][t], 0, ss8_1.str().c_str());
+								model.add(flowMinCapacityOB[v][i][t]);
+								flowCapacityOB[v][i][t].setExpr(oB[v][i][t](inst.q_v[v]-inst.f_min_jt[i-1][t-1]) - fOB[v][i][t]);
+							}
+							#endif
+
+							#ifdef WaitAfterOperate
+							ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
+							stringstream ss10_1;
+							ss10_1 << "flowMinLimitWB_"<<v<<","<<i<<","<<t;
+							
+							flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
+							model.add(flowCapacityWB[v][i][t]);
+							if(tightenFlow){
+								//Equal for discharging and loading ports
+								flowMinCapacityWB[v][i][t] = IloRange(env, -IloInfinity, wB[v][i][t]*inst.f_min_jt[i-1][t-1]-fWB[v][i][t], 0, ss10_1.str().c_str());
+								model.add(flowMinCapacityWB[v][i][t]);
+								flowCapacityWB[v][i][t].setExpr(wB[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1])-fWB[v][i][t]);							
+							}
+							#endif
+							ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
+							stringstream ss9_1;
+							ss9_1 << "flowLimitW_"<<v<<","<<i<<","<<t;
+							flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());
+							model.add(flowCapacityW[v][i][t]);
+							if(tightenFlow){
+								if(inst.typePort[i-1] == 1){ //Lower bound on flow for discharging ports
+									flowMinCapacityW[v][i][t] = IloRange(env, -IloInfinity, w[v][i][t]*inst.f_min_jt[i-1][t-1]-fW[v][i][t], 0, ss9_1.str().c_str());
+									model.add(flowMinCapacityW[v][i][t]);
+								}else{ //Upper bound on loading ports
+									flowCapacityW[v][i][t].setExpr(fW[v][i][t]-w[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+								}
+							}
+						}
+                    }
                     #ifndef NBranching                    
                         expr_sumOA += oA[v][i][t];
                     #endif
@@ -1885,23 +1893,24 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 					firstLevelFlow[v][i][tS_add-1].setExpr(expr_1stFlow);
 					secondLevelBalance[v][i][tS_add-1].setExpr(expr_2ndLevel);
 					secondLevelFlow[v][i][tS_add-1].setExpr(expr_2ndFlow);
+				
+					//Add constraints on the flow variables of last time period of previous block.
+					stringstream ss8,ss9,ss10;
+					#ifndef WaitAfterOperate
+					ss8 << "flowLimitOB_"<<v<<","<<i<<","<<tS_add-1;
+					flowCapacityOB[v][i][tS_add-1] = IloRange(env, -IloInfinity, fOB[v][i][tS_add-1]-inst.q_v[v]*oB[v][i][tS_add-1], 0, ss8.str().c_str());
+					model.add(flowCapacityOB[v][i][tS_add-1]);                            
+					#endif
+					ss9 << "flowLimitW_"<<v<<","<<i<<","<<tS_add-1;
+					flowCapacityW[v][i][tS_add-1] = IloRange(env, -IloInfinity, fW[v][i][tS_add-1]-inst.q_v[v]*w[v][i][tS_add-1], 0, ss9.str().c_str());
+					model.add(flowCapacityW[v][i][tS_add-1]);
+					#ifdef WaitAfterOperate
+					ss10 << "flowLimitWB_"<<v<<","<<i<<","<<tS_add-1;
+					flowCapacityWB[v][i][tS_add-1] = IloRange(env, -IloInfinity, fWB[v][i][tS_add-1]-inst.q_v[v]*wB[v][i][tS_add-1], 0, ss10.str().c_str());
+					model.add(flowCapacityWB[v][i][tS_add-1]);
+					#endif				
 				}
-			
-				//Add constraints on the flow variables of last time period of previous block.
-				stringstream ss8,ss9,ss10;
-				#ifndef WaitAfterOperate
-				ss8 << "flowLimitOB_"<<v<<","<<i<<","<<tS_add-1;
-				flowCapacityOB[v][i][tS_add-1] = IloRange(env, -IloInfinity, fOB[v][i][tS_add-1]-inst.q_v[v]*oB[v][i][tS_add-1], 0, ss8.str().c_str());
-				model.add(flowCapacityOB[v][i][tS_add-1]);                            
-				#endif
-				ss9 << "flowLimitW_"<<v<<","<<i<<","<<tS_add-1;
-				flowCapacityW[v][i][tS_add-1] = IloRange(env, -IloInfinity, fW[v][i][tS_add-1]-inst.q_v[v]*w[v][i][tS_add-1], 0, ss9.str().c_str());
-				model.add(flowCapacityW[v][i][tS_add-1]);
-				#ifdef WaitAfterOperate
-				ss10 << "flowLimitWB_"<<v<<","<<i<<","<<tS_add-1;
-				flowCapacityWB[v][i][tS_add-1] = IloRange(env, -IloInfinity, fWB[v][i][tS_add-1]-inst.q_v[v]*wB[v][i][tS_add-1], 0, ss10.str().c_str());
-				model.add(flowCapacityWB[v][i][tS_add-1]);
-				#endif
+
 			}
 			///end updating    
 						
@@ -2120,8 +2129,9 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 									if (hasEnteringArc1st[v1][i][t]==1){ //Only if exists an entering arc in the node
 										expr_berth += z[v1][i][t];
 										emptyExpr = false;
+									
+										expr_invBalancePort += -f[v1][i][t];
 									}
-									expr_invBalancePort += -f[v1][i][t];
 								}
 								if(!emptyExpr){ //Only if there are some Z variable in the expr
 									berthLimit[i][t] = IloRange(env,-IloInfinity, expr_berth, inst.b_j[i-1], ss.str().c_str());
@@ -2497,97 +2507,102 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 						secondLevelFlow[v][i][t].setExpr(expr_2ndFlow);
 						
 						firstLevelBalance[v][i][t].setName(ss.str().c_str());
-						model.add(firstLevelBalance[v][i][t]);
+						if(hasEnteringArc1st[v][i][t]==1){
+							model.add(firstLevelBalance[v][i][t]);
 						
-						secondLevelBalance[v][i][t].setName(ss1.str().c_str());
-						model.add(secondLevelBalance[v][i][t]);
+							secondLevelBalance[v][i][t].setName(ss1.str().c_str());
+							model.add(secondLevelBalance[v][i][t]);						
+						}						
 						
 						#ifndef WaitAfterOperate
 						linkBalance[v][i][t].setName(ss2.str().c_str());
 						model.add(linkBalance[v][i][t]);
 						#endif
 						
-						firstLevelFlow[v][i][t].setName(ss3.str().c_str());
-						model.add(firstLevelFlow[v][i][t]);
-						
-						secondLevelFlow[v][i][t].setName(ss4.str().c_str());
-						model.add(secondLevelFlow[v][i][t]);
+						if(hasEnteringArc1st[v][i][t]==1){
+							
+							firstLevelFlow[v][i][t].setName(ss3.str().c_str());
+							model.add(firstLevelFlow[v][i][t]);
+							
+							secondLevelFlow[v][i][t].setName(ss4.str().c_str());
+							model.add(secondLevelFlow[v][i][t]);
 
-						ss5 << "fjmin_(" << i << "," << t << ")," << v;
-						ss6 << "fjmax_(" << i << "," << t << ")," << v;
-						IloNum minfMax = min(inst.f_max_jt[i-1][t-1], inst.q_v[v]);
-						operationLowerLimit[v][i][t] = IloRange(env, 0, f[v][i][t] - inst.f_min_jt[i-1][t-1]*z[v][i][t] , IloInfinity, ss5.str().c_str());
-						model.add(operationLowerLimit[v][i][t]);
-						
-						operationUpperLimit[v][i][t] = IloRange(env, -IloInfinity, f[v][i][t] - minfMax*z[v][i][t],	0, ss6.str().c_str());
-						model.add(operationUpperLimit[v][i][t]);
-						
-						ss7 << "flowLimitOA_"<<v<<","<<i<<","<<t;
-						stringstream ss7_1;
-                        ss7_1 << "flowMinLimitOA_"<<v<<","<<i<<","<<t;
-						#ifndef WaitAfterOperate
-						if(tightenFlow){
-							if(inst.typePort[i-1] == 1){ //Minimum flow in discharging ports
-								flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, oA[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
-								model.add(flowMinCapacityOA[v][i][t]);
-							}else{ //Change upper bound for loading ports
-								flowCapacityOA.setExpr(fOA[v][i][t] - oA[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
-							}
-						}
-						#endif
-						#ifdef WaitAfterOperate
-						flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*z[v][i][t], 0, ss7.str().c_str());
-     					if(tightenFlow){
-							if(inst.typePort[i-1] == 1){ //Minimum flow in discharging port
-								flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, z[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
-								model.add(flowMinCapacityOA[v][i][t]);
-							}else{ //Change upper bound for loading ports
-								flowCapacityOA[v][i][t].setExpr(fOA[v][i][t] - z[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
-							}
-						}   
-						#endif
-						model.add(flowCapacityOA[v][i][t]);
-						
-						if(t<tF_add){ //Constraints with no last time index
+							ss5 << "fjmin_(" << i << "," << t << ")," << v;
+							ss6 << "fjmax_(" << i << "," << t << ")," << v;
+							IloNum minfMax = min(inst.f_max_jt[i-1][t-1], inst.q_v[v]);
+							operationLowerLimit[v][i][t] = IloRange(env, 0, f[v][i][t] - inst.f_min_jt[i-1][t-1]*z[v][i][t] , IloInfinity, ss5.str().c_str());
+							model.add(operationLowerLimit[v][i][t]);
+							
+							operationUpperLimit[v][i][t] = IloRange(env, -IloInfinity, f[v][i][t] - minfMax*z[v][i][t],	0, ss6.str().c_str());
+							model.add(operationUpperLimit[v][i][t]);
+							
+							ss7 << "flowLimitOA_"<<v<<","<<i<<","<<t;
+							stringstream ss7_1;
+							ss7_1 << "flowMinLimitOA_"<<v<<","<<i<<","<<t;
 							#ifndef WaitAfterOperate
-							ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
-                            stringstream ss8_1;
-                            ss8_1 << "flowMinLimitOB_"<<v<<","<<i<<","<<t;
-							flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-inst.q_v[v]*oB[v][i][t], 0, ss8.str().c_str());
-							model.add(flowCapacityOB[v][i][t]);
 							if(tightenFlow){
-								if(inst.typePort[i-1] == 1){
-									flowMinCapacityOB[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*oB[v][i][t] - fOB[v][i][t], 0, ss8_1.str().c_str());
-									model.add(flowMinCapacityOB[v][i][t]);
+								if(inst.typePort[i-1] == 1){ //Minimum flow in discharging ports
+									flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, oA[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
+									model.add(flowMinCapacityOA[v][i][t]);
+								}else{ //Change upper bound for loading ports
+									flowCapacityOA.setExpr(fOA[v][i][t] - oA[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
 								}
 							}
 							#endif
-							ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
-							stringstream ss9_1;
-							ss9_1 << "flowLimitW_"<<v<<","<<i<<","<<t;
-							flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());
-							model.add(flowCapacityW[v][i][t]);
-							if(tightenFlow){
-								if(inst.typePort[i-1] == 1){ //Lower bound on flow for discharging ports
-									flowMinCapacityW[v][i][t] = IloRange(env, -IloInfinity, w[v][i][t]*inst.f_min_jt[i-1][t-1]-fW[v][i][t], 0, ss9_1.str().c_str());
-									model.add(flowMinCapacityW[v][i][t]);
-								}else{ //Upper bound on loading ports
-									flowCapacityW[v][i][t].setExpr(fW[v][i][t]-w[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
-								}
-							}
 							#ifdef WaitAfterOperate
-							ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
-                            stringstream ss10_1;
-                            ss10_1 << "flowMinLimitWB_"<<v<<","<<i<<","<<t;
-							flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
-							model.add(flowCapacityWB[v][i][t]);
+							flowCapacityOA[v][i][t] = IloRange(env, -IloInfinity, fOA[v][i][t]-inst.q_v[v]*z[v][i][t], 0, ss7.str().c_str());
 							if(tightenFlow){
-								//Equal for discharging and loading ports
-								flowMinCapacityWB[v][i][t] = IloRange(env, -IloInfinity, wB[v][i][t]*inst.f_min_jt[i-1][t-1]-fWB[v][i][t], 0, ss10_1.str().c_str());
-								model.add(flowMinCapacityWB[v][i][t]);
-								flowCapacityWB[v][i][t].setExpr(wB[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1])-fWB[v][i][t]);							
-							}
+								if(inst.typePort[i-1] == 1){ //Minimum flow in discharging port
+									flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, z[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
+									model.add(flowMinCapacityOA[v][i][t]);
+								}else{ //Change upper bound for loading ports
+									flowCapacityOA[v][i][t].setExpr(fOA[v][i][t] - z[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+								}
+							}   
 							#endif
+							model.add(flowCapacityOA[v][i][t]);
+							
+							if(t<tF_add){ //Constraints with no last time index
+								#ifndef WaitAfterOperate
+								ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
+								stringstream ss8_1;
+								ss8_1 << "flowMinLimitOB_"<<v<<","<<i<<","<<t;
+								flowCapacityOB[v][i][t] = IloRange(env, -IloInfinity, fOB[v][i][t]-inst.q_v[v]*oB[v][i][t], 0, ss8.str().c_str());
+								model.add(flowCapacityOB[v][i][t]);
+								if(tightenFlow){
+									if(inst.typePort[i-1] == 1){
+										flowMinCapacityOB[v][i][t] = IloRange(env, -IloInfinity, inst.f_min_jt[i-1][t-1]*oB[v][i][t] - fOB[v][i][t], 0, ss8_1.str().c_str());
+										model.add(flowMinCapacityOB[v][i][t]);
+									}
+								}
+								#endif
+								ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
+								stringstream ss9_1;
+								ss9_1 << "flowMinLimitW_"<<v<<","<<i<<","<<t;
+								flowCapacityW[v][i][t] = IloRange(env, -IloInfinity, fW[v][i][t]-inst.q_v[v]*w[v][i][t], 0, ss9.str().c_str());
+								model.add(flowCapacityW[v][i][t]);
+								if(tightenFlow){
+									if(inst.typePort[i-1] == 1){ //Lower bound on flow for discharging ports
+										flowMinCapacityW[v][i][t] = IloRange(env, -IloInfinity, w[v][i][t]*inst.f_min_jt[i-1][t-1]-fW[v][i][t], 0, ss9_1.str().c_str());
+										model.add(flowMinCapacityW[v][i][t]);
+									}else{ //Upper bound on loading ports
+										flowCapacityW[v][i][t].setExpr(fW[v][i][t]-w[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+									}
+								}
+								#ifdef WaitAfterOperate
+								ss10 << "flowLimitWB_"<<v<<","<<i<<","<<t;
+								stringstream ss10_1;
+								ss10_1 << "flowMinLimitWB_"<<v<<","<<i<<","<<t;
+								flowCapacityWB[v][i][t] = IloRange(env, -IloInfinity, fWB[v][i][t]-inst.q_v[v]*wB[v][i][t], 0, ss10.str().c_str());
+								model.add(flowCapacityWB[v][i][t]);
+								if(tightenFlow){
+									//Equal for discharging and loading ports
+									flowMinCapacityWB[v][i][t] = IloRange(env, -IloInfinity, wB[v][i][t]*inst.f_min_jt[i-1][t-1]-fWB[v][i][t], 0, ss10_1.str().c_str());
+									model.add(flowMinCapacityWB[v][i][t]);
+									flowCapacityWB[v][i][t].setExpr(wB[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1])-fWB[v][i][t]);							
+								}
+								#endif
+							}
 						}
                         ///Another port-time iteraror (i,t)
                         if(v==0){
