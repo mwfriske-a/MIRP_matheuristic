@@ -19,7 +19,7 @@
 #define NFixSinkArc         
 
 //~ #define FixedGAP
-#define NImprovementPhase
+//~ #define NImprovementPhase
 #define NRandomTimeInterval				//Defined: Sequential selection of time intervals in the improvementPhase_timeIntervals, otherwise random selection
 
 #define PENALIZATION 1000
@@ -433,54 +433,106 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				if(reduceArcs && inst.delta[i-1] == inst.delta[j-1] && inst.idRegion[i-1] != inst.idRegion[j-1]){
 					addArcIJ = false;
 				}
-				if(addArcIJ){				
-					int t2 = t + inst.travelTime[v][i-1][j-1]; 
+				int t2;				
+				double arc_cost;
+				if(addArcIJ){ ///Builds arcs between (i,t) to (j,t2) - implicit hasEnteringArc (j,t2). Builds a mirror (j,t)->(i,t2) when possible
+					t2 = t + inst.travelTime[v][i-1][j-1]; 
 					if (t2<T){ 	//If exists time to reach port j 
-						double arc_cost;
-						if (inst.typePort[i-1]==1 && inst.typePort[j-1]==0){ //If port i is consuming and j is a producer port
-							arc_cost = inst.costKm[v]*inst.distanceMatrix[i-1][j-1]*(1-inst.trav_empt[v]) + inst.portFee[j-1];
-						}else{
-							arc_cost = inst.costKm[v]*inst.distanceMatrix[i-1][j-1] + inst.portFee[j-1];
-						}
-						hasArc[v][i][j][t] = 1;	
-						arcCost[v][i][j][t] = arc_cost;                        
-						if(t2 <= tOEB)      //If arriving node is in the model                            
-                            expr1 += arcCost[v][i][j][t]*x[v][i][j][t];
-                        
-                        //Relaxing 
-                        #ifdef NRelaxation
-                        if(t2 > timePerIntervalId){
-							convertX[v][i][j][t] = IloConversion(env, x[v][i][j][t], ILOFLOAT);
-							model.add(convertX[v][i][j][t]);
-						}
-						#endif
+						if(hasArc[v][i][j][t] != 1){ //If not added yet
+							if (inst.typePort[i-1]==1 && inst.typePort[j-1]==0){ //If port i is consuming and j is a producer port
+								arc_cost = inst.costKm[v]*inst.distanceMatrix[i-1][j-1]*(1-inst.trav_empt[v]) + inst.portFee[j-1];
+							}else{
+								arc_cost = inst.costKm[v]*inst.distanceMatrix[i-1][j-1] + inst.portFee[j-1];
+							}
+							hasArc[v][i][j][t] = 1;	
+							arcCost[v][i][j][t] = arc_cost;                        
+							if(t2 <= tOEB)      //If arriving node is in the model                            
+								expr1 += arcCost[v][i][j][t]*x[v][i][j][t];
+							
+							//Relaxing 
+							#ifdef NRelaxation
+							if(t2 > timePerIntervalId){
+								convertX[v][i][j][t] = IloConversion(env, x[v][i][j][t], ILOFLOAT);
+								model.add(convertX[v][i][j][t]);
+							}
+							#endif
 
-                        //Check if not set yet
-                        if(hasEnteringArc1st[v][j][t2] != 1){
-							hasEnteringArc1st[v][j][t2] = 1;
-							//~ #ifdef NRelaxation
-							//~ convertZ[v][j][t2] = IloConversion(env, z[v][j][t2], ILOFLOAT);
-							//~ model.add(convertZ[v][j][t2]);
-							
-							//~ convertW[v][j][t2] = IloConversion(env,w[v][j][t2], ILOFLOAT);
-							//~ model.add(convertW[v][j][t2]);
-							
-							//~ #ifdef WaitAfterOperate
-							//~ convertWB[v][j][t2] = IloConversion(env,wB[v][j][t2], ILOFLOAT);
-							//~ model.add(convertWB[v][j][t2]);
-							//~ #endif
-							
-							//~ #ifndef WaitAfterOperate
-							//~ convertOB[v][j][t2] = IloConversion(env,oB[v][j][t2], ILOFLOAT);
-							//~ model.add(convertOB[v][j][t2]);
-							//~ convertOA[v][j][t2] = IloConversion(env,oA[v][j][t2], ILOFLOAT);
-							//~ model.add(convertOA[v][j][t2]);
-							//~ #endif  
-							//~ #endif
+							//Check if not set yet
+							if(hasEnteringArc1st[v][j][t2] != 1){
+								hasEnteringArc1st[v][j][t2] = 1;
+								//~ #ifdef NRelaxation
+								//~ convertZ[v][j][t2] = IloConversion(env, z[v][j][t2], ILOFLOAT);
+								//~ model.add(convertZ[v][j][t2]);
+								
+								//~ convertW[v][j][t2] = IloConversion(env,w[v][j][t2], ILOFLOAT);
+								//~ model.add(convertW[v][j][t2]);
+								
+								//~ #ifdef WaitAfterOperate
+								//~ convertWB[v][j][t2] = IloConversion(env,wB[v][j][t2], ILOFLOAT);
+								//~ model.add(convertWB[v][j][t2]);
+								//~ #endif
+								
+								//~ #ifndef WaitAfterOperate
+								//~ convertOB[v][j][t2] = IloConversion(env,oB[v][j][t2], ILOFLOAT);
+								//~ model.add(convertOB[v][j][t2]);
+								//~ convertOA[v][j][t2] = IloConversion(env,oA[v][j][t2], ILOFLOAT);
+								//~ model.add(convertOA[v][j][t2]);
+								//~ #endif  
+								//~ #endif
+							}						
 						}						
-						
-                        
-						if (t2+1<T-1){ 			//Waiting arc 
+						//when time t reach a time that can be built a mirror between j and i
+						if(hasArc[v][j][i][t] != 1){
+							if (t >= inst.firstTimeAv[v]+1 + inst.travelTime[v][i-1][j-1]){ 
+								if (inst.typePort[j-1]==1 && inst.typePort[i-1]==0){ 		  //If port j is consuming and i is a producer port
+									arc_cost = inst.costKm[v]*inst.distanceMatrix[j-1][i-1]*(1-inst.trav_empt[v]) + inst.portFee[i-1];		
+								}else{
+									arc_cost = inst.costKm[v]*inst.distanceMatrix[j-1][i-1] + inst.portFee[i-1];
+								}
+								hasArc[v][j][i][t] = 1;
+								arcCost[v][j][i][t] = arc_cost;
+								
+								if(t2 <= tOEB)      //If arriving node is in the model
+									expr1 += arcCost[v][j][i][t]*x[v][j][i][t];
+								//Relaxing 
+								#ifdef NRelaxation
+								if(t2 > timePerIntervalId){ 
+									convertX[v][j][i][t] = IloConversion(env, x[v][j][i][t], ILOFLOAT);
+									model.add(convertX[v][j][i][t]);
+									if(hasEnteringArc1st[v][i][t2] != 1){
+										hasEnteringArc1st[v][i][t2] = 1; 
+										//~ convertZ[v][i][t2] = IloConversion(env, z[v][i][t2], ILOFLOAT);
+										//~ model.add(convertZ[v][i][t2]);
+										
+										//~ convertW[v][i][t2] = IloConversion(env,w[v][i][t2], ILOFLOAT);
+										//~ model.add(convertW[v][i][t2]);
+										
+										//~ #ifdef WaitAfterOperate
+										//~ convertWB[v][i][t2] = IloConversion(env,wB[v][i][t2], ILOFLOAT);
+										//~ model.add(convertWB[v][i][t2]);
+										//~ #endif
+										
+										//~ #ifndef WaitAfterOperate
+										//~ convertOB[v][i][t2] = IloConversion(env,oB[v][i][t2], ILOFLOAT);
+										//~ model.add(convertOB[v][i][t2]);
+										//~ convertOA[v][i][t2] = IloConversion(env,oA[v][i][t2], ILOFLOAT);
+										//~ model.add(convertOA[v][i][t2]);
+										//~ #endif         
+									}
+								}
+								#endif
+							}
+						}
+					}
+				}		
+				///For cases where i and j are not compatible, but j is can be compatible with other j2
+				///Builds waitJ, sinkJ, (j,t2)->(j2,t3), enteringJ2, 
+				if(addArcIJ || hasEnteringArc1st[v][j][t] == 1){
+					if(!addArcIJ){ //When i and j are not compatible
+						t2 = t;
+					}
+					if(t2<T){					
+						if (t2+1<T-1){ 			//Waiting arc of j
 							if(hasEnteringArc1st[v][j][t2+1] != 1){
 								hasEnteringArc1st[v][j][t2+1] = 1;
 								//~ #ifdef NRelaxation
@@ -505,57 +557,20 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 							}
 						}
 						//Sink arc from port j 
-						hasArc[v][j][N-1][t2] = 1;
-						arcCost[v][j][N-1][t2] = -(T-t2-1)*inst.perPeriodRewardForFinishingEarly;
-						if(t2 <= tOEB)      //If arriving node is in the model
-                            expr1 += arcCost[v][j][N-1][t2]*x[v][j][N-1][t2];
-						//Relaxing 
-						#ifdef NRelaxation
-						if(t2 > timePerIntervalId){ 
-							convertX[v][j][N-1][t2] = IloConversion(env, x[v][j][N-1][t2], ILOFLOAT);
-							model.add(convertX[v][j][N-1][t2]);
-						}
-						#endif
-						//when time t reach a time that can be built a mirror between j and i
-						if (t >= inst.firstTimeAv[v]+1 + inst.travelTime[v][i-1][j-1]){ 
-							if (inst.typePort[j-1]==1 && inst.typePort[i-1]==0){ 		  //If port j is consuming and i is a producer port
-								arc_cost = inst.costKm[v]*inst.distanceMatrix[j-1][i-1]*(1-inst.trav_empt[v]) + inst.portFee[i-1];		
-							}else{
-								arc_cost = inst.costKm[v]*inst.distanceMatrix[j-1][i-1] + inst.portFee[i-1];
-							}
-							hasArc[v][j][i][t] = 1;
-							arcCost[v][j][i][t] = arc_cost;
-							
+						if (hasArc[v][j][N-1][t2] != 1){
+							hasArc[v][j][N-1][t2] = 1;
+							arcCost[v][j][N-1][t2] = -(T-t2-1)*inst.perPeriodRewardForFinishingEarly;
 							if(t2 <= tOEB)      //If arriving node is in the model
-                                expr1 += arcCost[v][j][i][t]*x[v][j][i][t];
+								expr1 += arcCost[v][j][N-1][t2]*x[v][j][N-1][t2];
 							//Relaxing 
 							#ifdef NRelaxation
 							if(t2 > timePerIntervalId){ 
-								convertX[v][j][i][t] = IloConversion(env, x[v][j][i][t], ILOFLOAT);
-								model.add(convertX[v][j][i][t]);
-								if(hasEnteringArc1st[v][i][t2] != 1){
-									hasEnteringArc1st[v][i][t2] = 1; 
-									//~ convertZ[v][i][t2] = IloConversion(env, z[v][i][t2], ILOFLOAT);
-									//~ model.add(convertZ[v][i][t2]);
-									
-									//~ convertW[v][i][t2] = IloConversion(env,w[v][i][t2], ILOFLOAT);
-									//~ model.add(convertW[v][i][t2]);
-									
-									//~ #ifdef WaitAfterOperate
-									//~ convertWB[v][i][t2] = IloConversion(env,wB[v][i][t2], ILOFLOAT);
-									//~ model.add(convertWB[v][i][t2]);
-									//~ #endif
-									
-									//~ #ifndef WaitAfterOperate
-									//~ convertOB[v][i][t2] = IloConversion(env,oB[v][i][t2], ILOFLOAT);
-									//~ model.add(convertOB[v][i][t2]);
-									//~ convertOA[v][i][t2] = IloConversion(env,oA[v][i][t2], ILOFLOAT);
-									//~ model.add(convertOA[v][i][t2]);
-									//~ #endif         
-								}
+								convertX[v][j][N-1][t2] = IloConversion(env, x[v][j][N-1][t2], ILOFLOAT);
+								model.add(convertX[v][j][N-1][t2]);
 							}
 							#endif
-						}
+						}						
+						
 						//Create arc from j,t2 to others ports (j2) in time t3
 						for(int j2=1;j2<=J;j2++){
 							bool addArcJJ2 = false;
@@ -567,49 +582,50 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 								}
 							if(reduceArcs && inst.delta[j-1] == inst.delta[j2-1] && inst.idRegion[j-1] != inst.idRegion[j2-1]){ //If they are of the same type but from different regions, no add the arc
 								addArcJJ2 = false;
-							}
-							
+							}			
 							
 							if(addArcJJ2){
 								int t3 = t2+inst.travelTime[v][j-1][j2-1];  
-								if(t3<T){
-									if (inst.typePort[j-1]==1 && inst.typePort[j2-1]==0){
-										arc_cost = inst.costKm[v]*inst.distanceMatrix[j-1][j2-1]*(1-inst.trav_empt[v]) + inst.portFee[j2-1];		
-									}else{
-										arc_cost = inst.costKm[v]*inst.distanceMatrix[j-1][j2-1] + inst.portFee[j2-1];
-									}
-									hasArc[v][j][j2][t2] = 1;
-									arcCost[v][j][j2][t2] = arc_cost;
-									if(t3 <= tOEB)      //Ir arriving node is in the model
-                                        expr1 += arcCost[v][j][j2][t2]*x[v][j][j2][t2];
-									//Relaxing 
-									#ifdef NRelaxation
-									if(t3 > timePerIntervalId){ 
-										convertX[v][j][j2][t2] = IloConversion(env, x[v][j][j2][t2], ILOFLOAT);
-										model.add(convertX[v][j][j2][t2]);
-									}
-									#endif
-									if(hasEnteringArc1st[v][j2][t3] != 1){
-										hasEnteringArc1st[v][j2][t3] = 1;									
-										//~ #ifdef NRelaxation
-										//~ convertZ[v][j2][t3] = IloConversion(env, z[v][j2][t3], ILOFLOAT);
-										//~ model.add(convertZ[v][j2][t3]);
-										
-										//~ convertW[v][j2][t3] = IloConversion(env,w[v][j2][t3], ILOFLOAT);
-										//~ model.add(convertW[v][j2][t3]);
-										
-										//~ #ifdef WaitAfterOperate
-										//~ convertWB[v][j2][t3] = IloConversion(env,wB[v][j2][t3], ILOFLOAT);
-										//~ model.add(convertWB[v][j2][t3]);
-										//~ #endif
-										
-										//~ #ifndef WaitAfterOperate
-										//~ convertOB[v][j2][t3] = IloConversion(env,oB[v][j2][t3], ILOFLOAT);
-										//~ model.add(convertOB[v][j2][t3]);
-										//~ convertOA[v][j2][t3] = IloConversion(env,oA[v][j2][t3], ILOFLOAT);
-										//~ model.add(convertOA[v][j2][t3]);
-										//~ #endif  
-										//~ #endif
+								if(hasArc[v][j][j2][t2] != 1){
+									if(t3<T){
+										if (inst.typePort[j-1]==1 && inst.typePort[j2-1]==0){
+											arc_cost = inst.costKm[v]*inst.distanceMatrix[j-1][j2-1]*(1-inst.trav_empt[v]) + inst.portFee[j2-1];		
+										}else{
+											arc_cost = inst.costKm[v]*inst.distanceMatrix[j-1][j2-1] + inst.portFee[j2-1];
+										}
+										hasArc[v][j][j2][t2] = 1;
+										arcCost[v][j][j2][t2] = arc_cost;
+										if(t3 <= tOEB)      //Ir arriving node is in the model
+											expr1 += arcCost[v][j][j2][t2]*x[v][j][j2][t2];
+										//Relaxing 
+										#ifdef NRelaxation
+										if(t3 > timePerIntervalId){ 
+											convertX[v][j][j2][t2] = IloConversion(env, x[v][j][j2][t2], ILOFLOAT);
+											model.add(convertX[v][j][j2][t2]);
+										}
+										#endif
+										if(hasEnteringArc1st[v][j2][t3] != 1){
+											hasEnteringArc1st[v][j2][t3] = 1;									
+											//~ #ifdef NRelaxation
+											//~ convertZ[v][j2][t3] = IloConversion(env, z[v][j2][t3], ILOFLOAT);
+											//~ model.add(convertZ[v][j2][t3]);
+											
+											//~ convertW[v][j2][t3] = IloConversion(env,w[v][j2][t3], ILOFLOAT);
+											//~ model.add(convertW[v][j2][t3]);
+											
+											//~ #ifdef WaitAfterOperate
+											//~ convertWB[v][j2][t3] = IloConversion(env,wB[v][j2][t3], ILOFLOAT);
+											//~ model.add(convertWB[v][j2][t3]);
+											//~ #endif
+											
+											//~ #ifndef WaitAfterOperate
+											//~ convertOB[v][j2][t3] = IloConversion(env,oB[v][j2][t3], ILOFLOAT);
+											//~ model.add(convertOB[v][j2][t3]);
+											//~ convertOA[v][j2][t3] = IloConversion(env,oA[v][j2][t3], ILOFLOAT);
+											//~ model.add(convertOA[v][j2][t3]);
+											//~ #endif  
+											//~ #endif
+										}
 									}
 								}
 							}
@@ -617,7 +633,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					}
 				}
 			}
-			if(t+1<T){
+			if(t+1<T){ //Waitinng i
 				if(hasEnteringArc1st[v][i][t+1] != 1){
 					hasEnteringArc1st[v][i][t+1] = 1;
 					
@@ -643,17 +659,19 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				}
 			}
 			//Sink arc from port i
-			hasArc[v][i][N-1][t] = 1;
-			arcCost[v][i][N-1][t] = -(T-t-1)*inst.perPeriodRewardForFinishingEarly;
-			if(t <= tOEB)      //If arriving node is in the model
-                expr1 += arcCost[v][i][N-1][t]*x[v][i][N-1][t];
-			//Relaxing 
-			#ifdef NRelaxation
-			if(t > timePerIntervalId){ 
-				convertX[v][i][N-1][t] = IloConversion(env, x[v][i][N-1][t], ILOFLOAT);
-				model.add(convertX[v][i][N-1][t]);
+			if(hasArc[v][i][N-1][t] != 1){
+				hasArc[v][i][N-1][t] = 1;
+				arcCost[v][i][N-1][t] = -(T-t-1)*inst.perPeriodRewardForFinishingEarly;
+				if(t <= tOEB)      //If arriving node is in the model
+					expr1 += arcCost[v][i][N-1][t]*x[v][i][N-1][t];
+				//Relaxing 
+				#ifdef NRelaxation
+				if(t > timePerIntervalId){ 
+					convertX[v][i][N-1][t] = IloConversion(env, x[v][i][N-1][t], ILOFLOAT);
+					model.add(convertX[v][i][N-1][t]);
+				}
+				#endif
 			}
-			#endif
 		}
 
 		for(i=1;i<N-1;i++){		//Only considering ports
@@ -1128,7 +1146,8 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 						for(t=1;t<=tOEB;t++){
 							stringstream ss, ss1;
                             if (j<=J){				//When j is a port
-                                if(t + inst.travelTime[v][i-1][j-1] <= tOEB){ //Only if arc departs and arrives in the integer or relaxed block
+                                if(hasArc[v][i][j][t] == 1 &&
+									t + inst.travelTime[v][i-1][j-1] <= tOEB){ //Only if arc departs and arrives in the integer or relaxed block
                                     if(inst.typePort[i-1] == 0 && inst.typePort[j-1] == 1){
                                         ss << "travelAtCap_(" << i << "," << j << ")_" << t << "," << v;
                                         travelAtCapacity[v][i][j][t].setExpr(-fX[v][i][j][t] + inst.q_v[v]*x[v][i][j][t]);	
@@ -1730,10 +1749,10 @@ void Model::getSolution(IloEnv& env, Instance inst){
 									#endif
 									#ifdef WaitAfterOperate
 									wBValue[v][j][t] = cplex.getValue(wB[v][j][t]);
-									#endif                            
+									#endif     
 									wValue[v][j][t] = cplex.getValue(w[v][j][t]);
-								}								
-                                xValue[v][j][N][t] = cplex.getValue(x[v][j][N][t]);  //Gets the value of sink arc
+								}				
+		                         xValue[v][j][N][t] = cplex.getValue(x[v][j][N][t]);  //Gets the value of sink arc
 							}
 						}                                
 					}                    
@@ -2831,29 +2850,33 @@ void Model::unFixInterval(Instance inst, const int& tS, const int& tF){
         for(i=1;i<=J;i++){
             for(j=1;j<=N;j++){
                 for(t=tS;t<=tF;t++){
-                    if(i != j){
-                        if(j < N){ //If j is a port
-                            int t2 = t + inst.travelTime[v][i-1][j-1];
-                            if (t2<=tF)
-                                x[v][i][j][t].setBounds(0,1);
-                        }else{ //If j is the sink node
-                            x[v][i][j][t].setBounds(0,1);
-                        }
-                    }
+                    if(hasArc[v][i][j][t] == 1){
+						if(i != j){
+							if(j < N){ //If j is a port
+								int t2 = t + inst.travelTime[v][i-1][j-1];
+								if (t2<=tF)
+									x[v][i][j][t].setBounds(0,1);
+							}else{ //If j is the sink node
+								x[v][i][j][t].setBounds(0,1);
+							}
+						}
+					}
                     if(j==1){ //(v,i,t) iterator
-                        z[v][i][t].setBounds(0,1);
-                        #ifndef WaitAfterOperate
-                        oA[v][i][t].setBounds(0,1);
-                        #endif
-                        if(t<tF){
-                            w[v][i][t].setBounds(0,1);
-                            #ifdef WaitAfterOperate
-                            wB[v][i][t].setBounds(0,1);
-                            #endif
-                            #ifndef WaitAfterOperate
-                            oB[v][i][t].setBounds(0,1);
-                            #endif
-                        }
+                        if(hasEnteringArc1st[v][i][t]==1){
+							z[v][i][t].setBounds(0,1);
+							#ifndef WaitAfterOperate
+							oA[v][i][t].setBounds(0,1);
+							#endif
+							if(t<tF){
+								w[v][i][t].setBounds(0,1);
+								#ifdef WaitAfterOperate
+								wB[v][i][t].setBounds(0,1);
+								#endif
+								#ifndef WaitAfterOperate
+								oB[v][i][t].setBounds(0,1);
+								#endif
+							}
+						}
                     }
                 }
             }
@@ -3057,28 +3080,29 @@ void Model::fixAllSolution(IloEnv& env, const Instance& inst){
     int V = inst.speed.getSize();
     //Get the solution values
     getSolution(env,inst);
-    
     for(v=0;v<V;v++){
         for(i=1;i<=J;i++){
             for(j=1;j<=N;j++){
                 for(t=1;t<=T;t++){
-                    if(i != j){
+                    if(i != j && hasArc[v][i][j][t]==1){
                         x[v][i][j][t].setBounds(round(xValue[v][i][j][t]),round(xValue[v][i][j][t]));
                     }
                     if(j==1){ //(v,i,t) iterator
-                        z[v][i][t].setBounds(round(zValue[v][i][t]),round(zValue[v][i][t]));
-                        if(t<T){
-                            w[v][i][t].setBounds(round(wValue[v][i][t]),round(wValue[v][i][t]));
-                            #ifdef WaitAfterOperate
-                            wB[v][i][t].setBounds(round(wBValue[v][i][t]),round(wBValue[v][i][t]));
-                            #endif
-                            #ifndef WaitAfterOperate
-                            oB[v][i][t].setBounds(round(oBValue[v][i][t]),round(oBValue[v][i][t]));
-                            #endif
-                        }
-                        #ifndef WaitAfterOperate
-                        oA[v][i][t].setBounds(round(oAValue[v][i][t]),round(oAValue[v][i][t]));
-                        #endif
+                        if(hasEnteringArc1st[v][j][t] == 1) {
+							z[v][i][t].setBounds(round(zValue[v][i][t]),round(zValue[v][i][t]));
+							if(t<T){
+								w[v][i][t].setBounds(round(wValue[v][i][t]),round(wValue[v][i][t]));
+								#ifdef WaitAfterOperate
+								wB[v][i][t].setBounds(round(wBValue[v][i][t]),round(wBValue[v][i][t]));
+								#endif
+								#ifndef WaitAfterOperate
+								oB[v][i][t].setBounds(round(oBValue[v][i][t]),round(oBValue[v][i][t]));
+								#endif
+							}
+							#ifndef WaitAfterOperate
+							oA[v][i][t].setBounds(round(oAValue[v][i][t]),round(oAValue[v][i][t]));
+							#endif
+						}
                     }
                 }
             }
@@ -3761,7 +3785,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			model.cplex.exportModel("mip_R&F.lp");
 			if(!abortedRF){
 				cout << "Sucess!\n";
-				model.printSolution(env, inst, T);
+				//~ model.printSolution(env, inst, T);
 				model.cplex.writeMIPStarts(ss.str().c_str());
 			}
 		}else{		
@@ -3776,8 +3800,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		//~ //~ cout "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
 		model.cplex.setParam(IloCplex::EpGap, 1e-04);	//Set default GAP
         model.fixAllSolution(env, inst);
-		
-        double tLimit=0;
+		double tLimit=0;
         
         //~ model.improvementPhase_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
         //~ timeLimit/3, elapsed_time, incumbent);
