@@ -19,7 +19,7 @@
 #define NFixSinkArc         
 
 //~ #define FixedGAP
-//~ #define NImprovementPhase
+#define NImprovementPhase
 #define NRandomTimeInterval				//Defined: Sequential selection of time intervals in the improvementPhase_timeIntervals, otherwise random selection
 
 #define PENALIZATION 1000
@@ -1014,12 +1014,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				sP[i][t]-sP[i][t-1]-inst.delta[i-1]*expr_invBalancePort,
 				inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
 			model.add(portInventory[i][t]);
-			if(tightenInvConstr){
-				if(t>tOEB-nIntervals){
-					thighetInventoryValue += inst.d_jt[i-1][t-1];
-				}
-			}
-			
+					
             #ifndef NWWCCReformulation            
             stringstream ss3;
             //Common for both loading and discharging ports
@@ -1066,18 +1061,18 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
             #endif
 		}
 		ss1 << "cum_slack("<<i<<")";		
-		if(proportionalAlpha){
+		if(proportionalAlpha && nIntervals > 1 && endBlock > 0){
 			cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1]/(T-1)*tOEB, ss1.str().c_str());
 		}else{
 			cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
 		}
 		model.add(cumSlack[i]);  
 		
-		if(tightenInvConstr){
+		if(tightenInvConstr && nIntervals > 1 && endBlock > 0){
 			if(inst.delta[i-1] == 1){
-				sP[i][tOEB-1].setUB(inst.sMax_jt[i-1][0]-thighetInventoryValue);
+				sP[i][tOEB].setUB(inst.sMax_jt[i-1][0]-inst.sMax_jt[i-1][0]*0.1);
 			}else{
-				sP[i][tOEB-1].setLB(inst.sMin_jt[i-1][0]+thighetInventoryValue);
+				sP[i][tOEB].setLB(inst.sMin_jt[i-1][0] + inst.sMax_jt[i-1][0]*0.1);
 			}
 		}    
 	}
@@ -1821,17 +1816,17 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
     int N = J + 1;    	
 	//First gets the solution values for fixing (when needed)
 	if (tS_fix < T){		
-		cout <<  "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
+		//~ cout <<  "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
 		getSolValsW(env, inst, tS_fix, tF_fix, false);	//Get only values of the interval for fixing
 	}
 	
-	if (tS_int <= T){
-		cout << "Integralizing: [" << tS_int << "," << tF_int << "]\n";
-	}	
+	//~ if (tS_int <= T){
+		//~ cout << "Integralizing: [" << tS_int << "," << tF_int << "]\n";
+	//~ }	
 	///Removing end-block
-	if(tS_add <= T){
-		cout << "Adding to the model [" << tS_add << "," << tF_add << "]\n";
-	}
+	//~ if(tS_add <= T){
+		//~ cout << "Adding to the model [" << tS_add << "," << tF_add << "]\n";
+	//~ }
 		
     ///Objective function	
 	IloExpr expr_obj_current = cplex.getObjective().getExpr(); //Gets the current objective function
@@ -2171,11 +2166,6 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 									inst.delta[i-1]*inst.d_jt[i-1][t-1], ss2.str().c_str());
 								model.add(portInventory[i][t]);
 								
-								if(tightenInvConstr){
-									if(tF_add < T && t > tF_add-nIntervals){ //Does not thight the last time period of the original horizon
-										thighetInventoryValue += inst.d_jt[i-1][t-1];
-									}
-								}
 								//Obj
 								expr_obj_cost += inst.p_jt[i-1][t-1]*alpha[i][t];								//4rd term
 								#ifndef NBetas
@@ -2354,11 +2344,15 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 					if(v==0 && j == 1 && tS_add <= T){
 						//Update the previous thighted inventory and thight the new last interval
 						if(inst.delta[i-1]==1){
-							sP[i][tS_add-1].setUB(inst.sMax_jt[i-1][0]);
-							sP[i][tF_add].setUB(inst.sMax_jt[i-1][0]-thighetInventoryValue);
+							sP[i][tS_add-1].setUB(inst.sMax_jt[i-1][0]);							
+							if(tF_add < T){
+								sP[i][tF_add].setUB(inst.sMax_jt[i-1][0]-inst.sMax_jt[i-1][0]*0.1);
+							}
 						}else{
 							sP[i][tS_add-1].setLB(inst.sMin_jt[i-1][0]);
-							sP[i][tF_add].setLB(inst.sMin_jt[i-1][0]+thighetInventoryValue);
+							if(tF_add < T){
+								sP[i][tF_add].setLB(inst.sMin_jt[i-1][0]+inst.sMax_jt[i-1][0]*0.1);
+							}
 						}
 					}
 				}
@@ -2912,19 +2906,21 @@ const double& timeLimit, float& elapsed_time, double& incumbent){
 					//Allow vessels/port-time variables
 					for(v=0;v<V;v++){
 						for(t=1;t<=T;t++){
-                             z[v][idPort][t].setBounds(0,1);
-                             if(t<T){
-                                w[v][idPort][t].setBounds(0,1);
-                                 #ifdef WaitAfterOperate
-                                wB[v][idPort][t].setBounds(0,1);
-                                 #endif
-                                #ifndef WaitAfterOperate
-                                oB[v][idPort][t].setBounds(0,1);                                    
-                                #endif
-                            }
-                            #ifndef WaitAfterOperate
-                            oA[v][idPort][t].setBounds(0,1);                                
-                            #endif                            
+							if(hasEnteringArc1st[v][idPort][t]==1){
+								z[v][idPort][t].setBounds(0,1);
+								if(t<T){
+									w[v][idPort][t].setBounds(0,1);
+									 #ifdef WaitAfterOperate
+									wB[v][idPort][t].setBounds(0,1);
+									 #endif
+									#ifndef WaitAfterOperate
+									oB[v][idPort][t].setBounds(0,1);                                    
+									#endif
+								}
+								#ifndef WaitAfterOperate
+								oA[v][idPort][t].setBounds(0,1);                                
+								#endif
+							}
 						}
 					}
 					//Allow X variables to be solved
@@ -2932,7 +2928,9 @@ const double& timeLimit, float& elapsed_time, double& incumbent){
 						for(j1=1;j1<=N;j1++){
 							if(idPort != j1){
                                 for(t=1;t<=T;t++){
-                                    x[v][idPort][j1][t].setBounds(0,1);
+									if(hasArc[v][idPort][j1][t]==1){
+										x[v][idPort][j1][t].setBounds(0,1);
+									}
                                 }
                             }
 						}
@@ -2959,19 +2957,21 @@ const double& timeLimit, float& elapsed_time, double& incumbent){
 					//Get vessels/port-time variables values
 					for(v=0;v<inst.speed.getSize();v++){
 						for(t=1;t<=T;t++){
-							zValue[v][idPort][t] = cplex.getValue(z[v][idPort][t]);
-							if(t<T){
-                                wValue[v][idPort][t] = cplex.getValue(w[v][idPort][t]);
-                                #ifdef WaitAfterOperate
-                                wBValue[v][idPort][t] = cplex.getValue(wB[v][idPort][t]);
-                                #endif
-                                #ifndef WaitAfterOperate
-                                oBValue[v][idPort][t] = cplex.getValue(oB[v][idPort][t]);
-                                #endif
-                            }
-							#ifndef WaitAfterOperate
-							oAValue[v][idPort][t] = cplex.getValue(oA[v][idPort][t]);
-							#endif
+							if(hasEnteringArc1st[v][idPort][t]==1){
+								zValue[v][idPort][t] = cplex.getValue(z[v][idPort][t]);
+								if(t<T){
+									wValue[v][idPort][t] = cplex.getValue(w[v][idPort][t]);
+									#ifdef WaitAfterOperate
+									wBValue[v][idPort][t] = cplex.getValue(wB[v][idPort][t]);
+									#endif
+									#ifndef WaitAfterOperate
+									oBValue[v][idPort][t] = cplex.getValue(oB[v][idPort][t]);
+									#endif
+								}
+								#ifndef WaitAfterOperate
+								oAValue[v][idPort][t] = cplex.getValue(oA[v][idPort][t]);
+								#endif
+							}
 						}
 					}
 					
@@ -2980,7 +2980,9 @@ const double& timeLimit, float& elapsed_time, double& incumbent){
 						for(j1=1;j1<=J;j1++){
 							if(idPort != j1){
                                 for(t=1;t<=T;t++){
-                                    xValue[v][idPort][j1][t] = cplex.getValue(x[v][idPort][j1][t]);
+									if(hasArc[v][idPort][j1][t] == 1){
+										xValue[v][idPort][j1][t] = cplex.getValue(x[v][idPort][j1][t]);
+									}
                                 }
                             }
 						}
@@ -2995,19 +2997,21 @@ const double& timeLimit, float& elapsed_time, double& incumbent){
 					//Set vessels/port-time variables values
 					for(v=0;v<inst.speed.getSize();v++){
 						for(t=1;t<=T;t++){
-							z[v][idPort][t].setBounds(round(zValue[v][idPort][t]),round(zValue[v][idPort][t]));
-							if(t<T){
-                                w[v][idPort][t].setBounds(round(wValue[v][idPort][t]),round(wValue[v][idPort][t]));
-                                #ifdef WaitAfterOperate
-                                wB[v][idPort][t].setBounds(round(wBValue[v][idPort][t]),round(wBValue[v][idPort][t]));
-                                #endif
-                                #ifndef WaitAfterOperate
-                                oB[v][idPort][t].setBounds(round(oBValue[v][idPort][t]),round(oBValue[v][idPort][t]));
-                                #endif
-                            }
-							#ifndef WaitAfterOperate
-							oA[v][idPort][t].setBounds(round(oAValue[v][idPort][t]),round(oAValue[v][idPort][t]));
-							#endif
+							if(hasEnteringArc1st[v][idPort][t]==1){
+								z[v][idPort][t].setBounds(round(zValue[v][idPort][t]),round(zValue[v][idPort][t]));
+								if(t<T){
+									w[v][idPort][t].setBounds(round(wValue[v][idPort][t]),round(wValue[v][idPort][t]));
+									#ifdef WaitAfterOperate
+									wB[v][idPort][t].setBounds(round(wBValue[v][idPort][t]),round(wBValue[v][idPort][t]));
+									#endif
+									#ifndef WaitAfterOperate
+									oB[v][idPort][t].setBounds(round(oBValue[v][idPort][t]),round(oBValue[v][idPort][t]));
+									#endif
+								}
+								#ifndef WaitAfterOperate
+								oA[v][idPort][t].setBounds(round(oAValue[v][idPort][t]),round(oAValue[v][idPort][t]));
+								#endif
+							}
 						}
 					}
 					
@@ -3016,7 +3020,9 @@ const double& timeLimit, float& elapsed_time, double& incumbent){
 						for(j1=1;j1<=J;j1++){
 							if(idPort != j1){
                                 for(t=1;t<=T;t++){
-                                    x[v][idPort][j1][t].setBounds(round(xValue[v][idPort][j1][t]),round(xValue[v][idPort][j1][t]));
+									if(hasArc[v][idPort][j1][t] == 1){
+										x[v][idPort][j1][t].setBounds(round(xValue[v][idPort][j1][t]),round(xValue[v][idPort][j1][t]));
+									}
                                 }
                             }
 						}
@@ -3733,7 +3739,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			#ifdef NRelaxation
 			for (v=1; v <= maxIt; v++){
 				timer_cplex.start();
-				cout << "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
+				//~ cout << "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
 				if(!model.cplex.solve()){
 					//~ cout << model.cplex.getStatus() << endl;
 					opt_time += timer_cplex.total();
@@ -3782,9 +3788,9 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			double incumbent = obj1stPhase;
 			//~ //~ cout "Solution Status " << model.cplex.getStatus() << " Value: " << obj1stPhase << endl;
 			
-			model.cplex.exportModel("mip_R&F.lp");
+			//~ model.cplex.exportModel("mip_R&F.lp");
 			if(!abortedRF){
-				cout << "Sucess!\n";
+				//~ cout << "Sucess!\n";
 				//~ model.printSolution(env, inst, T);
 				model.cplex.writeMIPStarts(ss.str().c_str());
 			}
@@ -3796,6 +3802,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			obj1stPhase = model.cplex.getObjValue();       
         }
         double incumbent = obj1stPhase;
+        
         #ifndef NImprovementPhase	
 		//~ //~ cout "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
 		model.cplex.setParam(IloCplex::EpGap, 1e-04);	//Set default GAP
@@ -3813,13 +3820,13 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		
         //~ model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
         //~ tLimit, elapsed_time, incumbent); 
-        model.improvementPhaseVND_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        timeLimit, elapsed_time, incumbent);
+        //~ model.improvementPhaseVND_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+        //~ timeLimit, elapsed_time, incumbent);
         
         //~ model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
         //~ model.improvementPhaseVND_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
         
-		//~ model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, timeLimit, elapsed_time, incumbent);
+		model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, timeLimit, elapsed_time, incumbent);
 		
         //~ model.warmStart(env,inst,timePerIterSecond*72);
         
@@ -3871,7 +3878,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		#endif
 		
         /// Data (header in the main method)
-        cout << ss.str() << "\t" <<
+        cout << str << "\t" <<
 				maxIt << "\t" << 
 				time1stPhase/1000 << "\t" <<
 				obj1stPhase << "\t" << 
@@ -3885,7 +3892,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		///For iRace tests: <obj,time>
 		//~ cout << obj1stPhase << " " << time1stPhase/1000 << endl;
 		///Local search
-		cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
+		//~ cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
 		
         #endif
         
