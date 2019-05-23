@@ -188,10 +188,10 @@ namespace mirp{
 		void decreaseEndBlock (IloEnv& env, Instance inst, const double& nIntervals, const int& t2S, const int& t2F); //Add to the model FO and constranints the variables between t2S and t2F
 		void reIntegralize(IloEnv& env, Instance inst, const int& t1S, const int& t1F);
 		void improvementPhase_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent);
-		void improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent);
+		void improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& stopsByGap, unsigned int& stopsByTime);
 		void unFixInterval(Instance inst, const int& tS, const int& tF);
 		void improvementPhase_vessels(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, double& obj1stPhase, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time);
-		void improvementPhaseVND_vessels(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, double& obj1stPhase, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time);
+		void improvementPhaseVND_vessels(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, double& obj1stPhase, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,const double& timeLimit, float& elapsed_time, unsigned int& stopsByGap,unsigned int& stopsByTime);
 		void fixVessel(IloEnv env,Instance inst, const int& v, const bool& getSolution);
 		void fixVesselPair(IloEnv env, Instance inst, const int& v,const int& v1,const bool& getSolution);
 		void fixVesselInterval(IloEnv env,Instance inst, const int& v,const int& tS, const int& tF);
@@ -212,9 +212,9 @@ namespace mirp{
 			const double& timeLimit, float& elapsed_time, double& incumbent);
 		void improvementPhaseVND_intervalVessel(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, 
 			const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, 
-			const double& timeLimit, float& elapsed_time, double& incumbent);
+			const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& stopsByGap,unsigned int& stopsByTime);
 		
-		void improvementPhase_typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent);
+		void improvementPhase_typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& stopsByGap,unsigned int& stopsByTime);
 		void warmStart(IloEnv env, Instance inst, const double& timePerIter);
 		void addInventoryConstraints(Instance inst, IloEnv& env, bool& feasible);
 	};
