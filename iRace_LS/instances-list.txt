@@ -7,16 +7,34 @@
 
 # Empty lines and comments are ignored.
 
-LR1_1_DR1_3_VC1_V7a/ 
-LR1_1_DR1_4_VC3_V11a/ 
-LR1_2_DR1_3_VC3_V8a/ 
-LR2_11_DR2_22_VC3_V6a/ 
-LR2_22_DR2_22_VC3_V10a/ 
-LR2_22_DR3_333_VC4_V14a/ 
+# Note: for the improvement phase, it is necessary to put the mst files to be read in the execDir
 
-t60/LR1_1_DR1_3_VC1_V7a/ 
-t60/LR1_1_DR1_4_VC3_V11a/ 
-t60/LR1_2_DR1_3_VC3_V8a/ 
-t60/LR2_11_DR2_22_VC3_V6a/ 
-t60/LR2_22_DR2_22_VC3_V10a/ 
-t60/LR2_22_DR3_333_VC4_V14a/ 
+t45/LR1_1_DR1_3_VC1_V7a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR1_1_DR1_4_VC3_V11a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR1_1_DR1_4_VC3_V12a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR1_1_DR1_4_VC3_V12b/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR1_1_DR1_4_VC3_V8a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR1_1_DR1_4_VC3_V9a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR1_2_DR1_3_VC2_V6a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR1_2_DR1_3_VC3_V8a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR2_11_DR2_22_VC3_V6a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR2_11_DR2_33_VC4_V11a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR2_11_DR2_33_VC5_V12a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR2_22_DR2_22_VC3_V10a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR2_22_DR3_333_VC4_V14a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0 -e 1
+t45/LR2_22_DR3_333_VC4_V17a/ -o 50 -g 5 -q 0 -c 1 -z 0 -b 0 -e 1 
+
+t60/LR1_1_DR1_3_VC1_V7a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR1_1_DR1_4_VC3_V11a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR1_1_DR1_4_VC3_V12a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR1_1_DR1_4_VC3_V12b/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR1_1_DR1_4_VC3_V8a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR1_1_DR1_4_VC3_V9a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR1_2_DR1_3_VC2_V6a/ -o 50 -g 50 -q 0 -c 1 -d 0 -k 0 -z 1 -b 0
+t60/LR1_2_DR1_3_VC3_V8a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR2_11_DR2_22_VC3_V6a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR2_11_DR2_33_VC4_V11a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR2_11_DR2_33_VC5_V12a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR2_22_DR2_22_VC3_V10a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR2_22_DR3_333_VC4_V14a/ -o 50 -g 50 -q 0 -c 1 -d 1 -k 0 -z 1 -b 0
+t60/LR2_22_DR3_333_VC4_V17a/ -o 50 -g 50 -q 0 -c 1 -d 0 -k 0 -z 1 -b 0 

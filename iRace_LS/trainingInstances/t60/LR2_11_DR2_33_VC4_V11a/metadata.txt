@@ -1,0 +1,15 @@
+numPeriods                          60
+numCommodities                      1
+numLoadingRegions                   2
+numDischargeRegions                 2
+numLoadingPorts                     1 1
+numDischargePorts                   3 3
+numVesselClasses                    4
+numTermVesselsInClass               2 3 3 3
+hoursPerPeriod                      24
+spotMarketPricePerUnit              1
+spotMarketDiscountFactor            0.999
+attemptCost                         0.01
+perPeriodRewardForFinishingEarly    0.01
+constantForSinglePeriodAlphaSlack   1.0
+constantForCumulativeAlphaSlack     2.0

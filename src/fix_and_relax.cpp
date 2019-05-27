@@ -3850,8 +3850,8 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		
         //~ model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
         //~ tLimit, elapsed_time, incumbent); 
-        //~ model.improvementPhaseVND_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        //~ timeLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
+        model.improvementPhaseVND_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+        timeLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
         
         //~ model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
         //~ model.improvementPhaseVND_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time, stopsByGap, stopsByTime);
@@ -3908,23 +3908,23 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		#endif
 		
         /// Data (header in the main method)
-        cout << str << "\t" <<
-				maxIt << "\t" << 
-				time1stPhase/1000 << "\t" <<
-				obj1stPhase << "\t" << 
-				time2ndPhase/1000 << "\t" << 
-				obj2ndPhase << "\t" << 
-				opt_time/1000 << "\t" <<
-				(global_time-opt_time)/1000 << "\t" <<
-				abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
-				isInfeasible << "\t" <<
-				stopsByGap << "\t" <<
-				stopsByTime << "\t" <<
-				endl;
+        //~ cout << str << "\t" <<
+				//~ maxIt << "\t" << 
+				//~ time1stPhase/1000 << "\t" <<
+				//~ obj1stPhase << "\t" << 
+				//~ time2ndPhase/1000 << "\t" << 
+				//~ obj2ndPhase << "\t" << 
+				//~ opt_time/1000 << "\t" <<
+				//~ (global_time-opt_time)/1000 << "\t" <<
+				//~ abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
+				//~ isInfeasible << "\t" <<
+				//~ stopsByGap << "\t" <<
+				//~ stopsByTime << "\t" <<
+				//~ endl;
 		///For iRace tests: <obj,time>
 		//~ cout << obj1stPhase << " " << time1stPhase/1000 << endl;
 		///Local search
-		//~ cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
+		cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
 		
         #endif
         
