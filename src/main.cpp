@@ -15,7 +15,6 @@ stringstream ss;
 ss << "usuage is \n -v : Version (1 - for MILP; 2- for fix-and-relax vertically; 3-fix-and-relax horizontally) \n " 
 	<< "-p : instance path \n " 
 	<< "-t : time limit in seconds - for -v = 2, corresponds to timelimit of local searches \n " 
-	<< "-s : A string to put together in the logFile name \n" 
 	
 	<< "-q : 1 if use valid inequalities,0 otherwise \n"
 	<< "-c : 1 if use additional constraints, 0 otherwise \n"
@@ -30,6 +29,7 @@ ss << "usuage is \n -v : Version (1 - for MILP; 2- for fix-and-relax vertically;
 	<< "-f : Number of intervals that leaves the end block in each iteration (-v =2) \n "
 	<< "-o : percentage of overlapping between the fixed and the integer interval (-v =2) \n "
 	<< "-e : Size of the end block/vessels out of model (must be at most n-2) \n "
+	<< "-s : A string defining the fix-and-optimize procedures and their order to be used in the second phase \n" 
 	<< "-r : Vessels out of model (must be at most v-2) \n "
 	<< "-l : Time limit for solving each interval \n "
 	<< "-m : Number of intervals in the improvement phase (-v =2)\n "
@@ -38,7 +38,7 @@ ss << "usuage is \n -v : Version (1 - for MILP; 2- for fix-and-relax vertically;
 	<< "-u : Overlap in the imnprovement phase \n ";
 int modelId;
 stringstream file;
-string optstr;
+string fixOptStr;
 double timeLimit, gapFirst, gapSecond, overLap, mIntervals, nIntervals, overlap2;
 int opt, endBlock, outVessel, timePerIterFirst, timePerIterSecond, f ;
 bool validIneq, addConstr, tightenInvConstr, proportionalAlpha, reduceArcs, tightenFlow;
@@ -84,7 +84,7 @@ while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:b:n:g:f:o:e:r:l:m:i:h:u:")) !=
 			 timeLimit = stod(optarg);
 			break;		
 		case 's':
-			optstr = optarg;
+			fixOptStr = optarg;
 			break;
 		case 'q':
 			validIneq = atoi(optarg);
@@ -146,12 +146,12 @@ while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:b:n:g:f:o:e:r:l:m:i:h:u:")) !=
  switch (modelId){
 	case 1: 
 		#ifdef NTestInstanceSet
-		mirp::milp(file.str(), timeLimit, optstr);
+		mirp::milp(file.str(), timeLimit, fixOptStr);
 		break;
 		#endif
 		#ifndef NTestInstanceSet
         for(int i=0;i<instances.size();i++){
-			mirp::milp(instances[i], timeLimit, optstr);
+			mirp::milp(instances[i], timeLimit, fixOptStr);
 		}
 		#endif
 				
@@ -173,19 +173,19 @@ while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:b:n:g:f:o:e:r:l:m:i:h:u:")) !=
 				//~ endl;
         #ifndef NTestInstanceSet
         for(int i=0;i<instances.size();i++){
-            mirp::fixAndRelax(instances[i], optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, 
+            mirp::fixAndRelax(instances[i], fixOptStr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, 
 				mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit, validIneq, addConstr, tightenInvConstr,
 				proportionalAlpha, reduceArcs,tightenFlow);
         }
         #endif
         #ifdef NTestInstanceSet
-        mirp::fixAndRelax(file.str(), optstr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, 
+        mirp::fixAndRelax(file.str(), fixOptStr, nIntervals, gapFirst, f, overLap, endBlock, timePerIterFirst, 
 			mIntervals, timePerIterSecond, gapSecond, overlap2, timeLimit, validIneq, addConstr, tightenInvConstr,
 			proportionalAlpha, reduceArcs,tightenFlow);
         #endif
 		break;
 	case 3:
-		//~ mirp::fixAndRelaxH(file.str(), optstr, gapFirst, outVessel, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond,overlap2);	
+		//~ mirp::fixAndRelaxH(file.str(), fixOptStr, gapFirst, outVessel, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond,overlap2);	
 		break;
 	case 4:				
 		//~ mirp::fixAndRelaxHV(file.str(), nIntervals, f , overLap, endBlock, gapFirst, outVessel, timePerIterFirst, mIntervals, timePerIterSecond, gapSecond);

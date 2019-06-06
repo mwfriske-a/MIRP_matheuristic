@@ -2904,7 +2904,7 @@ const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& s
 	while((prevObj - objValue >= 0.1) && elapsed_time/1000 < timeLimit){
 		prevObj = objValue;
 		for(i=1;i>=0;i--){ //Type region (first allow discharging region)
-			//~ //~ cout "TYPE REGION = " << i << endl;
+			//~ cout << "Unfixing TYPE REGION = " << i << endl;
 			///Allow region variables
             for(r=0;r<inst.identifyPort[i].getSize();r++){ //For each region
 				for(j=0;j<inst.identifyPort[i][r].getSize();j++){ //Port
@@ -3000,7 +3000,7 @@ const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& s
 					}
 				}
 			}
-            
+            //~ cout << "Fixing TYPE REGION = " << i << endl;
             ///Re-fix the solved variables
 			for(r=0;r<inst.identifyPort[i].getSize();r++){ //For each region
 				for(j=0;j<inst.identifyPort[i][r].getSize();j++){ //Port
@@ -3705,7 +3705,7 @@ double& incumbent, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, con
 	fixVesselPair(env,inst,v1,v2,false);
 }
 
-void mirp::fixAndRelax(string file, string optStr, const double& nIntervals, const double& gapFirst, const int& f, const double& overLap, const int& endBlock,
+void mirp::fixAndRelax(string file, string fixOptStr, const double& nIntervals, const double& gapFirst, const int& f, const double& overLap, const int& endBlock,
 const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSecond, const double& gapSecond,
  const double& overlap2, const double& timeLimit,  const bool& validIneq, const bool& addConstr, 
  const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceArcs, const bool& tightenFlow){
@@ -3836,28 +3836,50 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		//~ //~ cout "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
 		model.cplex.setParam(IloCplex::EpGap, 1e-04);	//Set default GAP
         model.fixAllSolution(env, inst);
-		double tLimit=0;
-		
-        
+		double tLimit=timeLimit;
+		for(string::iterator it=fixOptStr.begin();it!=fixOptStr.end();++it){
+			tLimit = timeLimit;
+			elapsed_time = 0;
+			switch(*it){
+				case 'a':
+					//~ cout << *it << " - Interval Vessels " << tLimit << "\n";
+					model.improvementPhaseVND_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+						tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
+					time2ndPhase += elapsed_time;
+					break;
+				case 'b':
+					//~ cout << *it << " - Time Interval " << tLimit << "\n";
+					model.improvementPhaseVND_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+						tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
+					time2ndPhase += elapsed_time;
+					break;
+				case 'c':
+					//~ cout << *it << " - Vessel Pairs " << tLimit << "\n";
+					model.improvementPhaseVND_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, tLimit, elapsed_time, stopsByGap, stopsByTime);
+					time2ndPhase += elapsed_time;
+					break;
+				case 'd':
+					//~ cout << *it << " - Port Type " << tLimit << "\n";
+					model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
+					time2ndPhase += elapsed_time;
+					break;
+				default:
+					cerr << "No fix-and-optimize procedure for " << *it << endl;
+					break;					
+			}
+		}		
+						
         //~ model.improvementPhase_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
         //~ timeLimit/3, elapsed_time, incumbent);
-        
-        model.improvementPhaseVND_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-       timeLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
-        
+                     
         //~ tLimit = (timeLimit - elapsed_time/1000);//2;        
         //~ //~ cout "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;        
 		
         //~ model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
         //~ tLimit, elapsed_time, incumbent); 
-        model.improvementPhaseVND_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        timeLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
-        
+               
         //~ model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
-        //~ model.improvementPhaseVND_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time, stopsByGap, stopsByTime);
-        
-		//~ model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, timeLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
-		
+        		
         //~ model.warmStart(env,inst,timePerIterSecond*72);
         
         ///SOMENTE NESCESSARIO PARA OBTENÇÃO DE SOLUÇÃO COMPLETA

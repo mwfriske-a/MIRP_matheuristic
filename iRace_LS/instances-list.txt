@@ -9,7 +9,7 @@
 
 # Note: for the improvement phase, it is necessary to put the mst files to be read in the execDir
 
-t45/LR1_1_DR1_3_VC1_V7a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
+t45/LR1_1_DR1_3_VC1_V7a/ -o 50 -g 5 -q 0 -c 1 -z 0 -b 0
 t45/LR1_1_DR1_4_VC3_V11a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
 t45/LR1_1_DR1_4_VC3_V12a/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
 t45/LR1_1_DR1_4_VC3_V12b/ -o 50 -g 5 -q 1 -c 1 -z 0 -b 0
