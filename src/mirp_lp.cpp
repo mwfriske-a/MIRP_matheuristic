@@ -996,17 +996,17 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//~ cplex.setParam(IloCplex::PreslvNd,-1);
 	
 	//Cuts
-	//~ cplex.setParam(IloCplex::Covers, 3);		//Max 3
-	//~ cplex.setParam(IloCplex::GUBCovers, 2);		//Max 2
-	//~ cplex.setParam(IloCplex::FlowCovers, 2);	//Max 2
-	//~ cplex.setParam(IloCplex::Cliques, 3);		//Max 3
-	//~ cplex.setParam(IloCplex::FracCuts, 2);		//Max 2
-	//~ cplex.setParam(IloCplex::DisjCuts, 3);		//Max 3
-	//~ cplex.setParam(IloCplex::FlowPaths, 2);		//Max 2
-	//~ cplex.setParam(IloCplex::ImplBd, 2);		//Max 2
-	//~ cplex.setParam(IloCplex::MIRCuts, 2);		//Max 2
-	//~ cplex.setParam(IloCplex::MCFCuts, 2);		//Max 2
-	//~ cplex.setParam(IloCplex::ZeroHalfCuts, 2);	//Max 2
+	//~ cplex.setParam(IloCplex::Covers, -1);		//Max 3
+	//~ cplex.setParam(IloCplex::GUBCovers, -1);		//Max 2
+	//~ cplex.setParam(IloCplex::FlowCovers, -1);	//Max 2
+	//~ cplex.setParam(IloCplex::Cliques, -1);		//Max 3
+	//~ cplex.setParam(IloCplex::FracCuts, -1);		//Max 2
+	//~ cplex.setParam(IloCplex::DisjCuts, -1);		//Max 3
+	//~ cplex.setParam(IloCplex::FlowPaths, -1);		//Max 2
+	//~ cplex.setParam(IloCplex::ImplBd, -1);		//Max 2
+	//~ cplex.setParam(IloCplex::MIRCuts, -1);		//Max 2
+	//~ cplex.setParam(IloCplex::MCFCuts, -1);		//Max 2
+	//~ cplex.setParam(IloCplex::ZeroHalfCuts, -1);	//Max 2
 	
 	cplex.setOut(env.getNullStream());
 	cplex.setWarning(env.getNullStream());

@@ -9,6 +9,7 @@
 #define NDEBUG
 #include <assert.h>
 #define NBranching
+//~ #define NAlpha
 //~ #define NBetas  //Negative of alpha
 //~ #define NThetas //Plus of alpha
 #define WaitAfterOperate		//If defined, allows a vessel to wait after operated at a port.
@@ -62,7 +63,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	//~ //~ cout "Building model...\n Integer Block: [0," << timePerIntervalId << "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB << "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
 	
     ///Variables, converters and arrays to storage the values
+    #ifndef NAlpha
     alpha = NumVarMatrix(env, N);    
+    #endif
 	#ifndef NBetas
 	beta = NumVarMatrix(env, N);
 	#endif
@@ -358,7 +361,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	}
     //Port time (i,t)
 	for(i=1;i<N-1;i++){
+		#ifndef NAlpha
 		alpha[i] = IloNumVarArray(env,T);
+		#endif
 		sP[i] = IloNumVarArray(env, T);	
         #ifndef NBetas
         beta[i] = IloNumVarArray(env,T);
@@ -388,9 +393,11 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
                 //Unlimited port capacity at all
                 //~ sP[i][t] = IloNumVar(env, -IloInfinity, IloInfinity, ss.str().c_str());
                 
+				#ifndef NAlpha
 				ss.str(string());
 				ss << "alpha_(" << i << "," << t << ")";
 				alpha[i][t] = IloNumVar(env, 0, inst.alp_max_jt[i-1][t-1], ss.str().c_str());
+				#endif
                 #ifndef NBetas
                 ss.str(string());
 				ss << "beta_(" << i << "," << t << ")";
@@ -686,7 +693,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	
 	for(j=1;j<N-1;j++){
 		for(t=1;t<=tOEB;t++){			
+			#ifndef NAlpha
 			expr1 += inst.p_jt[j-1][t-1]*alpha[j][t];									//4rd term
+			#endif
             #ifndef NBetas
             expr1 += PENALIZATION*beta[j][t]; //100 may be enough
             #endif
@@ -733,8 +742,10 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	IloExpr expr_invBalancePort(env);
 	
 	//Cumulative spot market
+	#ifndef NAlpha
 	cumSlack = IloRangeArray(env,N-1);
 	IloExpr expr_cumSlack(env);
+	#endif
 	
 	//Limits on operation values
 	operationLowerLimit = IloArray<IloArray<IloRangeArray> >(env,V);
@@ -798,7 +809,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
         #endif
 		stringstream ss1;
 		berthLimit[i] = IloRangeArray(env,T);
+		#ifndef NAlpha
 		expr_cumSlack.clear();
+		#endif
 		portInventory[i] = IloRangeArray(env,T);
 		if(validIneq){
 			if (inst.typePort[i-1] == 0){ 	//Loading port
@@ -884,7 +897,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 						if (v==0){
 							kP1_RHS += inst.d_jt[i-1][t-1];
 							kD1_RHS += inst.d_jt[i-1][t-1];
+							#ifndef NAlpha
 							sum_alphaMax += inst.alp_max_jt[i-1][t-1];
+							#endif
 						}
 					}
 				}
@@ -897,8 +912,10 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 					kD1_RHS += -inst.sMax_jt[i-1][l-2] + inst.sMin_jt[i-1][k-1]; //equivalent 'l-1' and 'k' if index starts in 1                
 				}
 				///If considering alpha parameters, otherwise comment the above 2 lines
+				#ifndef NAlpha
 				kP1_RHS += - min(sum_alphaMax, inst.alp_max_j[i-1]);
 				kD1_RHS += - min(sum_alphaMax, inst.alp_max_j[i-1]);
+				#endif
 				
 				kP2_RHS = max(0.0,ceil(kP1_RHS/inst.f_max_jt[i-1][0]));
 				kP1_RHS = max(0.0,ceil(kP1_RHS/inst.maxVesselCapacity));
@@ -1000,8 +1017,10 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 				model.add(berthLimit[i][t]);
 			}
 			
+			#ifndef NAlpha
 			expr_cumSlack += alpha[i][t];
 			expr_invBalancePort += -alpha[i][t];
+			#endif
 			#ifndef NBetas
             expr_invBalancePort += beta[i][t];
             #endif
@@ -1060,6 +1079,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
             }
             #endif
 		}
+		#ifndef NAlpha
 		ss1 << "cum_slack("<<i<<")";		
 		if(proportionalAlpha && nIntervals > 1 && endBlock > 0){
 			cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1]/(T-1)*tOEB, ss1.str().c_str());
@@ -1067,7 +1087,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 			cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
 		}
 		model.add(cumSlack[i]);  
-		
+		#endif
 		if(tightenInvConstr && nIntervals > 1 && endBlock > 0){
 			if(inst.delta[i-1] == 1){
 				sP[i][tOEB].setUB(inst.sMax_jt[i-1][0]-inst.sMax_jt[i-1][0]*0.1);
@@ -1077,7 +1097,9 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		}    
 	}
     //~ //~ //~ cout "it_kt = " << it_kt << endl;
+	#ifndef NAlpha
 	expr_cumSlack.end();
+	#endif
 	expr_berth.end();
 	expr_invBalancePort.end();
 	
@@ -1713,7 +1735,7 @@ void Model::getSolValsW(IloEnv& env, Instance inst, const int& tS, const int& tF
             }
         }
 	}else{
-		//~ cout << "Impossible to get feasible solution values!" << endl;
+		cout << "Impossible to get feasible solution values!" << endl;
 		exit(1);
 	}
 }
@@ -1755,7 +1777,7 @@ void Model::getSolution(IloEnv& env, Instance inst){
             }
         }
 	}else{
-		//~ cout << "Impossible to get feasible solution values!" << endl;
+		cout << "Impossible to get feasible solution values!" << endl;
 		exit(1);
 	}
 }
@@ -1799,7 +1821,7 @@ void Model::getSolutionVesselPair(IloEnv& env, Instance inst, const unsigned int
             }
         }
 	}else{
-		//~ cout << "Impossible to get feasible solution values!" << endl;
+		cout << "Impossible to get feasible solution values!" << endl;
 		exit(1);
 	}
 }
@@ -1833,7 +1855,10 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 	IloExpr expr_obj_cost(env);
 	IloExpr expr_obj_revenue(env);
 			
-	IloExpr expr_cumSlack(env), expr_berth(env), expr_invBalancePort(env);    
+	#ifndef NAlpha
+	IloExpr expr_cumSlack(env);
+	#endif
+	IloExpr expr_berth(env), expr_invBalancePort(env);    
 	IloExpr expr_sinkFlow(env), expr_1stLevel(env), expr_2ndLevel(env), expr_1stFlow(env), expr_2ndFlow(env);
 	IloExpr expr_opd(env);
     
@@ -1931,8 +1956,10 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 			///port iterator (i)
 			if(v==0){
 				if(tS_add <= T){
+					#ifndef NAlpha
 					expr_cumSlack.clear();
 					expr_cumSlack = cumSlack[i].getExpr();
+					#endif
 										
 					if(validIneq){ 
 						int it,it2=0,k,l;
@@ -2017,7 +2044,9 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 										if(v1==0){
 											kP1_RHS += inst.d_jt[i-1][t-1];
 											kD1_RHS += inst.d_jt[i-1][t-1];
+											#ifndef NAlpha
 											sum_alphaMax += inst.alp_max_jt[i-1][t-1];
+											#endif
 										}
 									}
 								}
@@ -2029,8 +2058,10 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 									kD1_RHS += -inst.sMax_jt[i-1][l-2] + inst.sMin_jt[i-1][k-1];                                
 								}                                
 								///If considering alpha parameters, otherwise comment the above 2 lines
+								#ifndef NAlpha
 								kP1_RHS += - min(sum_alphaMax, inst.alp_max_j[i-1]);
 								kD1_RHS += - min(sum_alphaMax, inst.alp_max_j[i-1]);
+								#endif
 								
 								kP2_RHS = max(0.0,ceil(kP1_RHS/inst.f_max_jt[i-1][0]));
 								kP1_RHS = max(0.0,ceil(kP1_RHS/inst.maxVesselCapacity));
@@ -2152,8 +2183,10 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 									model.add(berthLimit[i][t]);
 								}
 								
+								#ifndef NAlpha
 								expr_cumSlack += alpha[i][t];
 								expr_invBalancePort += -alpha[i][t];
+								#endif
 								#ifndef NBetas
 								expr_invBalancePort += beta[i][t];
 								#endif
@@ -2167,7 +2200,9 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 								model.add(portInventory[i][t]);
 								
 								//Obj
+								#ifndef NAlpha
 								expr_obj_cost += inst.p_jt[i-1][t-1]*alpha[i][t];								//4rd term
+								#endif
 								#ifndef NBetas
 								expr_obj_cost += PENALIZATION*beta[i][t];										//Auxiliary variables
 								#endif
@@ -2668,12 +2703,14 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
                         #endif
 					}
 				}
+				#ifndef NAlpha
 				if(v==0){
 					cumSlack[i].setExpr(expr_cumSlack);
 					if(proportionalAlpha){
 						cumSlack[i].setUB(inst.alp_max_j[i-1]/T*tF_add);
 					}
 				}
+				#endif
                 #ifndef NBranching
                 //~ priorityX[v][i].setExpr(expr_sumEnteringX);
                 priorityOA[v][i].setExpr(expr_sumOA);
@@ -3889,7 +3926,6 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
         #endif
         
 		global_time += timer_global.total();
-		time2ndPhase = elapsed_time;//global_time - time1stPhase;
 		obj2ndPhase	= incumbent;//model.cplex.getObjValue();
 		
 		//For getting information about solution
