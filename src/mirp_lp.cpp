@@ -1008,7 +1008,7 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//~ cplex.setParam(IloCplex::MCFCuts, -1);		//Max 2
 	//~ cplex.setParam(IloCplex::ZeroHalfCuts, -1);	//Max 2
 	
-	cplex.setOut(env.getNullStream());
+	//~ cplex.setOut(env.getNullStream());
 	cplex.setWarning(env.getNullStream());
 	cplex.setParam(IloCplex::Threads, 1);
 	//~ cplex.setParam(IloCplex::ConflictDisplay, 2); 

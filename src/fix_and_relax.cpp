@@ -20,7 +20,7 @@
 #define NFixSinkArc
 
 //~ #define FixedGAP
-//~ #define NImprovementPhase
+#define NImprovementPhase
 #define NRandomTimeInterval				//Defined: Sequential selection of time intervals in the improvementPhase_timeIntervals, otherwise random selection
 
 #define PENALIZATION 1000
@@ -112,6 +112,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
     convertWB = IloArray<IloArray<IloArray<IloConversion> > >(env,V);
     wBValue = IloArray<IloArray<IloNumArray> >(env,V);
 	#endif
+	sPValue = IloArray<IloNumArray>(env,N);
 	IloExpr expr_opd(env);
     if(addConstr){
 		operateAndDepart = IloArray<IloArray<IloRangeArray> >(env,V);
@@ -365,6 +366,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		alpha[i] = IloNumVarArray(env,T);
 		#endif
 		sP[i] = IloNumVarArray(env, T);	
+		sPValue[i] = IloNumArray(env,T);
         #ifndef NBetas
         beta[i] = IloNumVarArray(env,T);
         #endif
@@ -1731,7 +1733,12 @@ void Model::getSolValsW(IloEnv& env, Instance inst, const int& tS, const int& tF
                         wValue[v][i][tS-1] = cplex.getValue(w[v][i][tS-1]);                        
                         //~ //~ //~ cout "w["<<v<<"]["<<i<<"["<<tS-1<<"] = " << wValue[v][i][tS-1] << endl;
 					}
-                }     
+                }  
+                //Gets the node inventory - for feeding local valid inequalities
+                for(t=1;t<=tF;t++){
+					sPValue[i][t] = cplex.getValue(sP[i][t]);					  
+					//~ cout << "sP[" << i << "," << t << "] " << sPValue[i][t] << endl;
+				}
             }
         }
 	}else{
@@ -1960,7 +1967,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 					expr_cumSlack.clear();
 					expr_cumSlack = cumSlack[i].getExpr();
 					#endif
-										
+				}						
 					if(validIneq){ 
 						int it,it2=0,k,l;
 						IloExpr expr_kP1_LHS(env), expr_kP2_LHS(env), expr_kD1_LHS(env), expr_kD2_LHS(env);
@@ -1983,13 +1990,13 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 								it2++;
 							}else{ // when it is > T-2
 								l = 2 + (it-(T-2));
-							}            
+							}  
 							//valid inequality is created from scratch - If it is in interval [1...[tS-2..tF-1]], or If it is in interval [[2..tS-1]...tF]
 							if( (it >= tS_add-3 && it < tF_add-2) || 
 								( (it >= T-2 + tS_add-5 && it < T-2+tF_add-2) || (tF_add == T && it > T-2 + tS_add-5) ) ||
 								  (it >= T-2 && it < T-2 + tS_add-4)){ //Case of extending which is equivalent to add
 								//~ if(i==1){
-									//~ //~ //~ cout "Adding new: " << it << " [" << l << "," << k << "]";
+									//~ cout << "Adding new: " << it << " [" << l << "," << k << "]\n";
 									//~ if (it >= T-2 && it < T-2-1 + tS_add-2) //When updating the VI1
 										//~ //~ //~ cout " - Replacing";
 									//~ //~ //~ cout endl;
@@ -2054,8 +2061,15 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 									kP1_RHS += -inst.sMax_jt[i-1][0] + inst.s_j0[i-1];
 									kD1_RHS += -inst.s_j0[i-1] + inst.sMin_jt[i-1][0];
 								}else{
-									kP1_RHS += -inst.sMax_jt[i-1][0] + inst.sMin_jt[i-1][0];
-									kD1_RHS += -inst.sMax_jt[i-1][l-2] + inst.sMin_jt[i-1][k-1];                                
+									kP1_RHS += -inst.sMax_jt[i-1][0];
+									kD1_RHS += inst.sMin_jt[i-1][0];
+									if(l <= tS_fix){ //Local valid inequality
+										kP1_RHS += sPValue[i][l-1];
+										kD1_RHS += -sPValue[i][l-1];
+									}else{
+										kP1_RHS += inst.sMin_jt[i-1][0];
+										kD1_RHS += -inst.sMax_jt[i-1][0];
+									}
 								}                                
 								///If considering alpha parameters, otherwise comment the above 2 lines
 								#ifndef NAlpha
@@ -2125,7 +2139,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 								int t0 = max(1, tS_add-inst.maxTravelTimeInstance);
 								if(k >= t0){
 									//~ if(i==1)
-										//~ //~ //~ cout "Updating  " << it << " ["<< l << "," << k << "]\n";
+										//~ cout << "Updating  " << it << " ["<< l << "," << k << "]\n";
 									//Get the current expr values                 
 									if (inst.typePort[i-1] == 0)
 										expr_kP1_LHS = knapsack_P_1[i][it].getExpr();
@@ -2147,7 +2161,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 							}						
 						}
 					}	
-				}
+				//~ }
                 #ifndef NWWCCReformulation
                 it_kt= (tS_add-1)*tS_add/2;
                 #endif
@@ -3862,7 +3876,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			}
 		}else{		
 			//~ cout << "Reading MST file...\n";
-			model.cplex.readMIPStart(ss.str().c_str());
+			model.cplex.readMIPStarts(ss.str().c_str());
 			model.cplex.setParam(IloCplex::TiLim, 1);        
 			model.cplex.solve(); 
 			obj1stPhase = model.cplex.getObjValue();       
@@ -3980,9 +3994,9 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 				//~ stopsByTime << "\t" <<
 				//~ endl;
 		///For iRace tests: <obj,time>
-		//~ cout << obj1stPhase << " " << time1stPhase/1000 << endl;
+		cout << obj1stPhase << " " << time1stPhase/1000 << endl;
 		///Local search
-		cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
+		//~ cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
 		
         #endif
         
