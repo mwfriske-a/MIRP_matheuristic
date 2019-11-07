@@ -52,15 +52,15 @@ using mirp::Instance;
 void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nIntervals, const int& endBlock, 
 		const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha,
 		const bool& reduceArcs, const bool& tightenFlow){	
-	int i, j,t,v,a;
-	int timePerIntervalId = inst.t/nIntervals; //Number of time periods in each interval
+	int i, j,t,v,a;	
+	int timePerIntervalId = nIntervals; //Number of time periods in each interval
 	int J = inst.numTotalPorts;
 	int T = inst.t+1;
 	double intPart;
 	int tOEB = inst.t - (timePerIntervalId*max(0.0,endBlock-modf(nIntervals, &intPart))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
 	int V = inst.speed.getSize(); //# of vessels
     int N = J + 2;
-	//~ //~ cout "Building model...\n Integer Block: [0," << timePerIntervalId << "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB << "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
+	cout << "Building model...\n Integer Block: [0," << timePerIntervalId << "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB << "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
 	
     ///Variables, converters and arrays to storage the values
     #ifndef NAlpha
@@ -1838,7 +1838,8 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
     const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& tightenFlow){
 	int i,j,t,v,a, t0;
 	int T = inst.t;
-	int timePerIntervalId = T/nIntervals; //Number of time periods in each interval
+	//~ int timePerIntervalId = T/nIntervals; //Number of time periods in each interval
+	int timePerIntervalId = nIntervals; //Number of time periods in each interval
 	int J = inst.numTotalPorts;	
 	double intPart;	
 	int V = inst.speed.getSize(); //# of vessels
@@ -1996,7 +1997,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 								( (it >= T-2 + tS_add-5 && it < T-2+tF_add-2) || (tF_add == T && it > T-2 + tS_add-5) ) ||
 								  (it >= T-2 && it < T-2 + tS_add-4)){ //Case of extending which is equivalent to add
 								//~ if(i==1){
-									//~ cout << "Adding new: " << it << " [" << l << "," << k << "]\n";
+									//~ cout << "Adding new: " << it << " [" << l << "," << k << "]";
 									//~ if (it >= T-2 && it < T-2-1 + tS_add-2) //When updating the VI1
 										//~ //~ //~ cout " - Replacing";
 									//~ //~ //~ cout endl;
@@ -2087,13 +2088,14 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const
 									ss << "knpasackP1_" << i << "_(" << l << "," << k << ")";
 									ss1 << "knapsackP2_" << i << "_(" << l << "," << k << ")";
 									if (it >= T-2 && it < T-2-1 + tS_add-2){ //When updating the VI1
+										//~ cout << "RHS = (P) " << kP1_RHS << endl;
 										knapsack_P_1[i][it].setBounds(kP1_RHS,IloInfinity);
 										knapsack_P_1[i][it].setExpr(expr_kP1_LHS);
 										knapsack_P_1[i][it].setName(ss.str().c_str());
 										knapsack_P_2[i][it].setBounds(kP2_RHS,IloInfinity);
 										knapsack_P_2[i][it].setExpr(expr_kP2_LHS);
 										knapsack_P_2[i][it].setName(ss1.str().c_str());
-									}else{ //When adding a new
+									}else{ //When adding a new										
 										knapsack_P_1[i][it] = IloRange(env, kP1_RHS, expr_kP1_LHS, IloInfinity, ss.str().c_str());
 										knapsack_P_2[i][it] = IloRange(env, kP2_RHS, expr_kP2_LHS, IloInfinity, ss1.str().c_str());
 										model.add(knapsack_P_1[i][it]);
@@ -3755,7 +3757,9 @@ double& incumbent, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, con
 	//~ cout << "Fixing vessel v1 and v2 " << v1 << " " << v2 << endl;
 	fixVesselPair(env,inst,v1,v2,false);
 }
-
+/*
+ * Note: 07-11-19 - parameter nIntervals corresponds to the number of time periods per interval
+ */  
 void mirp::fixAndRelax(string file, string fixOptStr, const double& nIntervals, const double& gapFirst, const int& f, const double& overLap, const int& endBlock,
 const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSecond, const double& gapSecond,
  const double& overlap2, const double& timeLimit,  const bool& validIneq, const bool& addConstr, 
@@ -3779,12 +3783,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 	try{
 		Instance inst(env);
 		inst.readInstance(env, file);
-		//Verify if the number of intervals is compatible with the instance
-		//~ if(fmod((double)inst.t ,nIntervals) != 0 || fmod((double)inst.t,mIntervals != 0)){
-			//~ //~ cout << "Error: the number of intervals n or m must be a divisor of Time instace without rest" << endl;
-			//~ exit(1);
-		//~ }
-		
+				
 		int v, j, t, t1S, t1F, t2S, t2F, t3S, t3F;
 		int J = inst.numTotalPorts;
 		int T = inst.t;
@@ -3797,10 +3796,11 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		model.setParameters(env, timePerIterFirst, gapFirst);
         //~ model.cplex.exportModel("mip_R&F.lp");
 		//Relax-and-fix
-		double p = T/nIntervals*(1-overLap/100); // Units of t that are add at each iteration to the model.
-		int s = T-(T/nIntervals*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
-		int sizeInterval = T/nIntervals;		 // Last t of integer block (always starting with 1 integer interval)
-        int maxIt = ceil((T-sizeInterval)/p);        
+		double p = nIntervals*(1-overLap/100); // Units of t that are add at each iteration to the model.
+		int s = T-(nIntervals*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
+		double sizeInterval = nIntervals;		 // Last t of integer block (always starting with 1 integer interval)		
+        int maxIt = ceil((T-sizeInterval)/p);					
+        
         //For write and reading a mst file
 		size_t pos = file.find("LR");
 		string str = file.substr(pos);
@@ -3831,9 +3831,9 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 				}
 				opt_time += timer_cplex.total();
 				//~ cout "Solution Status " << model.cplex.getStatus() << " Value: " << model.cplex.getObjValue() << endl;
-				
-				t3S = ceil(T/nIntervals * (v-1) * (1-overLap/100))+1;
-				t3F = min(ceil(T/nIntervals * v * (1-overLap/100)),(double)T);
+								
+				t3S = ceil(sizeInterval * (v-1) * (1-overLap/100))+1;
+				t3F = min(ceil(sizeInterval * v * (1-overLap/100)),(double)T);
 
 				t2S = ceil(s+p*(v-1))+1;
 				t2F = min(ceil(s+p*v), (double)T); 
@@ -3849,7 +3849,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 				
 				#ifndef FixedGAP
 				double newGap = max(0.001, (gapFirst - gapFirst/maxIt*v)/100);
-				//~ //~ cout "New GAP " << newGap*100 << " % \n \n";
+				//~ cout << "New GAP " << newGap*100 << " % \n \n";
 				model.cplex.setParam(IloCplex::EpGap, newGap);            
 				#endif
 			}
