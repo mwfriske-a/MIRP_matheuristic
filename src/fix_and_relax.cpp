@@ -35,6 +35,9 @@ using namespace std;
 using mirp::Model;
 using mirp::Instance;
 
+default_random_engine engine;
+int seed1;
+
 /* Build a model for the first iteration of fix and relax
  * All variables are created (including that are in end block)
  * Just 1st interval have integer variables. 
@@ -3780,15 +3783,20 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 	///Read input files
 	IloEnv env;
 	
+	//Randomness 
+    int seed1 = 1;
+	engine.seed(seed1);
+	
 	try{
 		Instance inst(env);
 		inst.readInstance(env, file);
+		inst.perturb(env,file,10);
 				
 		int v, j, t, t1S, t1F, t2S, t2F, t3S, t3F;
 		int J = inst.numTotalPorts;
 		int T = inst.t;
 		int V = inst.speed.getSize(); //# of vessels        
-
+	
 		/// NEW MODEL		
 		Model model(env);
 		model.buildFixAndRelaxModel(env,inst, nIntervals, endBlock, validIneq, addConstr, tightenInvConstr, 

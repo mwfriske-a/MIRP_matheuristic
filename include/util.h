@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <random>
 
 typedef IloArray<IloNumVarArray> NumVarMatrix;
 typedef IloArray<IloIntVarArray> IntVarMatrix;
@@ -40,9 +41,16 @@ bool DBL_L (double, double);
 double fRand(double fMin, double fMax,const int& seed);
 int iRand(int fMin, int fMax);
 
+extern int seed1;
+extern std::default_random_engine engine;
+
 namespace mirp{
 	
 struct Instance{
+//Random 
+int iRand2(int iMin, int iMax);	
+float fRand2(float fMin, float fMax);
+//~ std::default_random_engine generator;
 ///Parameters
 //Metadata
 IloInt t; 					//# Time periods
@@ -142,5 +150,6 @@ bool isInModel(const int& tWEB, const int& v, const int& a);	//FOR RELAX-AND-FIX
 bool shouldRelaxArc(const int& tInteger, const int& v, const int& a);  //FOR RELAX-AND-FIX: Return true if an arc must be relaxed given tInteger as the last t of integer block
 bool shouldAddArc(const int& tS, const int& tF,const int& v, const int& a); //For Relax-and-fix: Retunr true if arc should be inserted on the model while end block is reduced 
 bool shouldIntegralizeArc(const int& v, const int& a, const int& t1S, const int& t1F);
+void perturb(IloEnv& env, const std::string name, const int& numInstances);
 };
 }

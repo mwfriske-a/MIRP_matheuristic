@@ -775,6 +775,152 @@ void Instance::readInstance(IloEnv& env, const string& name){
 	}
 	
 }
+
+/*
+ * From the instance readed, create a new one pertubed randomly
+ * Save the new instance in a separated folder
+ * Generates a number of instances according to numInstaces
+ */ 
+void Instance::perturb(IloEnv& env, string name, const int& numInstances){
+	int ins,i,j,t,r;
+	name.erase(name.end()-1);
+	for(ins=0;ins<numInstances;ins++){
+		//New directory
+		stringstream directory, instanceName;
+		instanceName << name << "_" << ins;
+		directory << "mkdir -p " << name  << "_" << ins;
+		system(directory.str().c_str());
+
+		//Metadata
+		stringstream metaName;
+		metaName << instanceName.str() << "/metadata.txt";
+		ofstream metadata(metaName.str());	
+		metadata << "numPeriods                          " << 30 << "\n";
+		metadata << "numCommodities                      1\n";
+		metadata << "numLoadingRegions                   " << loadReg << "\n";
+		metadata << "numDischargeRegions                 " << discReg << "\n";
+		metadata << "numLoadingPorts                     ";
+		for (j=0;j<loadReg;j++){
+			metadata << loadPorts[j] << " ";
+		}
+		metadata << "\n";
+		metadata << "numDischargePorts                   ";
+		for (j=0;j<discReg;j++){
+			metadata << discPorts[j] << " ";
+		}
+		metadata << "\n";
+		metadata << "numVesselClasses                    " << vC << "\n";
+		metadata << "numTermVesselsInClass               ";
+		for (j=0;j<vC;j++){
+			metadata << v[j] << " ";
+		}
+		metadata << "\n";
+		metadata << "hoursPerPeriod                      24\n";
+		metadata << "spotMarketPricePerUnit              " << spotMarketPricePerUnit << "\n";
+		metadata << "spotMarketDiscountFactor            " << spotMarketDiscountFactor << "\n";
+		metadata << "attemptCost                         " << attemptCost << "\n";
+		metadata << "perPeriodRewardForFinishingEarly    " << perPeriodRewardForFinishingEarly << "\n";
+		metadata << "constantForSinglePeriodAlphaSlack   " << constantForSinglePeriodAlphaSlack << "\n";
+		metadata << "constantForCumulativeAlphaSlack     " << constantForCumulativeAlphaSlack;		
+		metadata.close();
+		
+		//Loading ports info
+		stringstream lPortsName;
+		lPortsName << instanceName.str() << "/loading_port_data.txt";
+		ofstream loadP(lPortsName.str());	
+		int id=0;
+		for(r=0;r<loadReg;r++){
+			for(j=0;j<loadPorts[r];j++){
+			loadP << "name               " << "LoadingRegion_" << r << "_Port_" << j << "\n";
+			loadP << "index              " << id << "\n";			
+			loadP << "type               Loading\n";
+			loadP << "regionIndex        " << r << "\n";
+			loadP << "x_coordinate       " << x_coordinate[id] << "\n";
+			loadP << "y_coordinate       " << y_coordinate[id] << "\n";
+			loadP << "fixedPortFee       " << portFee[id] << "\n";
+			loadP << "numBerths          " << b_j[id] << "\n";
+			loadP << "maxAmountPerPeriod " << f_max_jt[id][0] << "\n";
+			loadP << "minAmountPerPeriod " << f_min_jt[id][0] << "\n";
+			loadP << "capacity           " << sMax_jt[id][0] << "\n";
+			loadP << "initialInventory   " << s_j0[id] << "\n";
+			loadP << "production         ";
+			for(t=0;t<30;t++){
+				loadP << d_jt[id][t] << " ";
+			}
+			loadP << "\n";
+			id++;
+			}
+		}
+		loadP.close();
+		
+		//Discharging ports info
+		stringstream dPortsName;
+		dPortsName << instanceName.str() << "/discharge_port_data.txt";
+		ofstream discP(dPortsName.str());
+		for(r=0;r<discReg;r++){
+			for(j=0;j<discPorts[r];j++){
+				discP << "name               " << "DischargeRegion_" << r << "_Port_" << j << "\n";
+				discP << "index              " << id << "\n";			
+				discP << "type               Discharge\n";
+				discP << "regionIndex        " << loadReg+r << "\n";
+				discP << "x_coordinate       " << x_coordinate[id] << "\n";
+				discP << "y_coordinate       " << y_coordinate[id] << "\n";
+				discP << "fixedPortFee       " << portFee[id] << "\n";
+				discP << "numBerths          " << b_j[id] << "\n";
+				discP << "maxAmountPerPeriod " << f_max_jt[id][0] << "\n";
+				discP << "minAmountPerPeriod " << f_min_jt[id][0] << "\n";
+				discP << "capacity           " << sMax_jt[id][0] << "\n";
+				discP << "initialInventory   " << s_j0[id] << "\n";
+				discP << "consumption        ";
+				for(t=0;t<30;t++){
+					discP << d_jt[id][t] << " ";
+				}
+				discP << "\n";
+				discP << "revenue            ";
+				for(t=0;t<30;t++){
+					discP << r_jt[id][t] << " ";
+				}
+				discP << "\n";
+				id++;
+			}
+		}
+		discP.close();
+		
+		//Distance matrix
+		stringstream distMatrixName;
+		distMatrixName << instanceName.str() << "/distances.txt";
+		ofstream distances(distMatrixName.str());
+		distances << "----- FullDistanceMatrix -----\n";
+		for(j=0;j<numTotalPorts;j++){
+			distances << "        " << j;
+		}
+		distances << "\n";
+		for(j=0;j<numTotalPorts;j++){
+			distances << j;
+			for(i=0;i<numTotalPorts;i++){
+				distances << " " << distanceMatrix[j][i];
+			}
+			distances << "\n";
+		}
+		distances << "FullDistanceMatrix(i,j) = distance (km) from port i to port j. \n";
+		distances.close();
+	}
+}
+
+int Instance::iRand2(int iMin, int iMax){	
+	uniform_int_distribution<int> urd(iMin,iMax);
+	int rNumber = urd(engine);
+	//~ cout << rNumber << " ";
+	return rNumber;
+}
+
+float Instance::fRand2(float fMin, float fMax){	
+	uniform_real_distribution<float> urd(fMin,fMax);
+	float rNumber = urd(engine);
+	//~ cout << "Rand float " << rNumber << " ";
+	return rNumber;
+}
+
 //type: 0 not used arc, 1 source arc, 2 regular arc(travel/waiting), 3 sink arc
 void Instance::addArc(const int& vesselId, const int& type, const int& j1, const int& t1, const int& j2, const int& t2){
 	string arc;	
