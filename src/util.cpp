@@ -167,6 +167,7 @@ void Instance::readInstance(IloEnv& env, const string& name){
 	portFee = IloNumArray(env, numTotalPorts);
 	x_coordinate = IloIntArray(env,numTotalPorts);
 	y_coordinate = IloIntArray(env,numTotalPorts);
+	idPortInRegion = IloIntArray(env,numTotalPorts);
 	
 	//Inter ports
 	distanceMatrix = NumNumMatrix(env,numTotalPorts);
@@ -229,6 +230,7 @@ void Instance::readInstance(IloEnv& env, const string& name){
 		}
 		int idR = stoi(namePort[1]), idP = stoi(namePort[3]);
 		int idPort = identifyPort[0][idR][idP];
+		idPortInRegion[idPort] = idP;
 		//~ cout << "Region " << idR << " Port " << idP << endl;
 		for(i=0;i<4;i++) getline(lPorts,s); //Jump some info
 		
@@ -317,6 +319,7 @@ void Instance::readInstance(IloEnv& env, const string& name){
 		}
 		int idR = stoi(namePort[1]), idP = stoi(namePort[3]);
 		int idPort = identifyPort[1][idR][idP];
+		idPortInRegion[idPort] = idP;
 		for(i=0;i<4;i++) getline(dPorts,s); //Jump some info
 		
 		stringstream(s) >> s1 >> x_coordinate[idPort];
@@ -531,6 +534,7 @@ void Instance::readInstance(IloEnv& env, const string& name){
 	costKm = IloNumArray(env, totalVessels);
 	trav_empt = IloNumArray(env, totalVessels);
 	identifyVessel = IntMatrix(env,vC);
+	vesselClass = IloIntArray(env, totalVessels);
 	idI = 0;
 	for(i=0;i<vC;i++){
 		identifyVessel[i] = IloIntArray(env,v[i]);
@@ -544,7 +548,7 @@ void Instance::readInstance(IloEnv& env, const string& name){
 		for (j=0;j<3;j++) getline(vessel,s);
 		int idClass;
 		stringstream(s) >> s1 >> idClass;
-		
+		vesselClass[i] = idClass;
 		//Uptade vessel data from vessel class data 
 		q_v[i] = capacity[idClass];
 		speed[i] = avgSpeedInKnots[idClass];
@@ -904,6 +908,65 @@ void Instance::perturb(IloEnv& env, string name, const int& numInstances){
 		}
 		distances << "FullDistanceMatrix(i,j) = distance (km) from port i to port j. \n";
 		distances.close();
+		
+		//Travel times
+		stringstream travelTName;
+		travelTName << instanceName.str() << "/travelTimes.txt";
+		ofstream tTime(travelTName.str());
+		tTime << "----- FullTravelTimeMatrixForClass -----\n";
+		for(int c=0;c<vC;c++){
+			tTime << "Vessel_Class_" << c <<"\n";
+			tTime << "    ";
+			//Header
+			for(i=0;i<numTotalPorts; i++){
+				tTime << i << "  ";
+			}
+			tTime << "\n";
+			for(i=0;i<numTotalPorts; i++){
+				tTime << " " << i;
+				for(j=0;j<numTotalPorts; j++){
+					tTime << " " << travelTime[identifyVessel[c][0]][i][j];
+				}
+				tTime << "\n";
+			}
+		}
+		tTime << "FullTravelTimeMatrixForClass(vc,i,j) = travel time (number of periods) for a vessel in vessel class vc to travel from port i to port j.";
+		tTime.close();
+		
+		//Vessel class
+		stringstream vClassName;
+		vClassName << instanceName.str() << "/vessel_class_data.txt";
+		ofstream vClass(vClassName.str());
+		for(int c=0;c<vC;c++){
+			vClass << "name                   Vessel_Class_" << c << "\n";
+			vClass << "index                  " << c << "\n";
+			vClass << "capacity               " << q_v[identifyVessel[c][0]] << "\n";
+			vClass << "avgSpeedInKnots        " << speed[identifyVessel[c][0]] << "\n";
+			vClass << "travelCostAsTermPerKm  " << costKm[identifyVessel[c][0]] << "\n";
+			vClass << "discountTravelingEmpty " << trav_empt[identifyVessel[c][0]] << "\n";			
+		}
+		vClass.close();
+		
+		//Vessels
+		stringstream vesselName;
+		vesselName << instanceName.str() << "/vessel_data.txt";
+		ofstream vessel(vesselName.str());
+		for(int v1=0;v1<q_v.getSize();v1++){
+			vessel << "name                 Vessel_" << v1 << "\n";
+			vessel << "index                " << v1 << "\n";
+			vessel << "vesselClass          " << vesselClass[v1] << "\n";
+			vessel << "type                 Term\n";
+			vessel << "initialInventory     " << s_v0[v1] << "\n";
+			vessel << "initialPort          " ;
+			if(delta[initialPort[v1]] == 1){
+				vessel << "LoadingRegion_" << idRegion[initialPort[v1]] << "_Port_" << idPortInRegion[initialPort[v1]];
+			}else{
+				vessel << "DischargeRegion_" << idRegion[initialPort[v1]] - loadReg << "_Port_" << idPortInRegion[initialPort[v1]];
+			}
+			vessel << "\n";
+			vessel << "firstTimeAvailable   " << firstTimeAv[v1] << "\n";			
+		}
+		vessel.close();
 	}
 }
 

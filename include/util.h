@@ -83,6 +83,7 @@ IloIntArray y_coordinate;	// Y coordinate
 //Identifier - just for reading instance
 IloArray<IntMatrix> identifyPort;	// Identify for a loading or unloading region, what is the index of port in the parameters above. [l(d)][r][p] where l(d) is the loading(dischargin), r is the region id and p is the port id
 IloIntArray typePort; //Opposite of the identifyPort, for each port if id=0 is loading port,  and id=1 is unloading port
+IloIntArray idPortInRegion; // States for the id of for in the region (always starts in 0);
 
 //Inter ports
 NumNumMatrix distanceMatrix;		//Distance between port i and j;
@@ -121,6 +122,7 @@ IloNumArray s_v0;			// Initial inventory at vessel v of class c
 IloIntArray initialPort;	// Initial port of vessel v
 IloIntArray firstTimeAv;	// First time available vessel
 //Equal for each vessel in the same class
+IloIntArray vesselClass;		//Class of vessel v
 IloNumArray q_v; 			// Capacity of vessel v 
 IloNumArray speed;			// Speed of vessel v
 IloNumArray costKm;			// Cost per km of vessel v
