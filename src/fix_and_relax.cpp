@@ -10,10 +10,10 @@
 #include <assert.h>
 #define NBranching
 //~ #define NAlpha
-//~ #define NBetas  //Negative of alpha
-//~ #define NThetas //Plus of alpha
+#define NBetas  //Negative of alpha
+#define NThetas //Plus of alpha
 #define WaitAfterOperate		//If defined, allows a vessel to wait after operated at a port.
-#define NRelaxation				// Relax all intervals (end block should be 0) for obtaing the lower bound
+//~ #define NRelaxation				// Relax all intervals (end block should be 0) for obtaing the lower bound
 #define NWWCCReformulation
 #define NStartUPValidInequalities
 #define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
@@ -63,7 +63,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 	int tOEB = inst.t - (timePerIntervalId*max(0.0,endBlock-modf(nIntervals, &intPart))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
 	int V = inst.speed.getSize(); //# of vessels
     int N = J + 2;
-	cout << "Building model...\n Integer Block: [0," << timePerIntervalId << "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB << "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
+	//~ cout << "Building model...\n Integer Block: [0," << timePerIntervalId << "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB << "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
 	
     ///Variables, converters and arrays to storage the values
     #ifndef NAlpha
@@ -3880,7 +3880,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			if(!abortedRF){
 				//~ cout << "Sucess!\n";
 				//~ model.printSolution(env, inst, T);
-				model.cplex.writeMIPStarts(ss.str().c_str());
+				//~ model.cplex.writeMIPStarts(ss.str().c_str());
 			}
 		}else{		
 			//~ cout << "Reading MST file...\n";
