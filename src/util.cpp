@@ -417,10 +417,10 @@ void Instance::readInstance(IloEnv& env, const string& name){
 	}
 	//~ cout << "x: "<<minX << " " << maxX << endl;
 	//~ cout << "y: "<<minY << " " << maxY << endl;
-	srand(maxX); //seed value
+	srand(2020); //seed value
 	for (j=0;j<numTotalPorts;j++){
-		x_coordinate[j] = iRand(minX,maxX);
-		y_coordinate[j] = iRand(minY,maxY);
+		x_coordinate[j] = iRand2(minX,maxX);
+		y_coordinate[j] = iRand2(minY,maxY);
 		cout << "Port " << j << endl <<
 		"x_coordinate\t" << x_coordinate[j] << endl <<
 		"y_coordinate\t" << y_coordinate[j]<< endl << endl;
@@ -433,7 +433,6 @@ void Instance::readInstance(IloEnv& env, const string& name){
 		logPlot << j << "\t" << x_coordinate[j] << "\t" << y_coordinate[j] << "\n";	
 	}
 	logPlot.close();	
-	//~ exit(1);
 	#endif
 	///Distancematrix
 	//~ ifstream distanceFile;

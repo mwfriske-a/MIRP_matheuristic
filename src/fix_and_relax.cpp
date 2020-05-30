@@ -9,11 +9,11 @@
 #define NDEBUG
 #include <assert.h>
 #define NBranching
-//~ #define NAlpha
-#define NBetas  //Negative of alpha
-#define NThetas //Plus of alpha
+// #define NAlpha
+// #define NBetas  //Negative of alpha
+// #define NThetas //Plus of alpha
 #define WaitAfterOperate		//If defined, allows a vessel to wait after operated at a port.
-//~ #define NRelaxation				// Relax all intervals (end block should be 0) for obtaing the lower bound
+#define NRelaxation				// Relax all intervals (end block should be 0) for obtaing the lower bound
 #define NWWCCReformulation
 #define NStartUPValidInequalities
 #define NSimplifyModel				//Remove arcs between port i and j for vessel v if min_f_i + min_f_j > Q_v
@@ -52,18 +52,18 @@ int seed1;
  * - reduceArcs: Does not consider the arcs between port of same type and different regions, or ports i,j of the same region with F^Min_i+F^Min_j > Q_v
  * - tightenFlow: For flow variables fWB(fOB) - for DP change the upper bound, for LP create a lower bound
  */
-void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nIntervals, const int& endBlock, 
+void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& timePerInterval, const int& endBlock, 
 		const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha,
 		const bool& reduceArcs, const bool& tightenFlow){	
 	int i, j,t,v,a;	
-	int timePerIntervalId = nIntervals; //Number of time periods in each interval
+	int timePerIntervalId = timePerInterval; //Number of time periods in each interval
 	int J = inst.numTotalPorts;
 	int T = inst.t+1;
 	double intPart;
-	int tOEB = inst.t - (timePerIntervalId*max(0.0,endBlock-modf(nIntervals, &intPart))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
+	int tOEB = inst.t - (timePerIntervalId*max(0.0,endBlock-modf(timePerInterval, &intPart))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
 	int V = inst.speed.getSize(); //# of vessels
     int N = J + 2;
-	//~ cout << "Building model...\n Integer Block: [0," << timePerIntervalId << "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB << "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
+	// cout << "Building model...\n Integer Block: [0," << timePerIntervalId << "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB << "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
 	
     ///Variables, converters and arrays to storage the values
     #ifndef NAlpha
@@ -1086,14 +1086,14 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& nInt
 		}
 		#ifndef NAlpha
 		ss1 << "cum_slack("<<i<<")";		
-		if(proportionalAlpha && nIntervals > 1 && endBlock > 0){
+		if(proportionalAlpha && timePerInterval > 1 && endBlock > 0){
 			cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1]/(T-1)*tOEB, ss1.str().c_str());
 		}else{
 			cumSlack[i] = IloRange(env, expr_cumSlack, inst.alp_max_j[i-1], ss1.str().c_str());
 		}
 		model.add(cumSlack[i]);  
 		#endif
-		if(tightenInvConstr && nIntervals > 1 && endBlock > 0){
+		if(tightenInvConstr && timePerInterval > 1 && endBlock > 0){
 			if(inst.delta[i-1] == 1){
 				sP[i][tOEB].setUB(inst.sMax_jt[i-1][0]-inst.sMax_jt[i-1][0]*0.1);
 			}else{
@@ -1836,29 +1836,29 @@ void Model::getSolutionVesselPair(IloEnv& env, Instance inst, const unsigned int
 	}
 }
 
-void Model::modifyModel(IloEnv& env, Instance inst, const int& nIntervals, const int& tS_fix, const int& tF_fix, 
+void Model::modifyModel(IloEnv& env, Instance inst, const int& timePerInterval, const int& tS_fix, const int& tF_fix, 
     const int& tS_add, const int& tF_add, const int& tS_int, const int& tF_int, const bool& validIneq,
     const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& tightenFlow){
 	int i,j,t,v,a, t0;
 	int T = inst.t;
-	//~ int timePerIntervalId = T/nIntervals; //Number of time periods in each interval
-	int timePerIntervalId = nIntervals; //Number of time periods in each interval
+	//~ int timePerIntervalId = T/timePerInterval; //Number of time periods in each interval
+	int timePerIntervalId = timePerInterval; //Number of time periods in each interval
 	int J = inst.numTotalPorts;	
 	double intPart;	
 	int V = inst.speed.getSize(); //# of vessels
     int N = J + 1;    	
 	//First gets the solution values for fixing (when needed)
 	if (tS_fix < T){		
-		cout <<  "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
+		// cout <<  "Fixing interval [" << tS_fix << "," << tF_fix << "]\n";
 		getSolValsW(env, inst, tS_fix, tF_fix, false);	//Get only values of the interval for fixing
 	}
 	
 	if (tS_int <= T){
-		cout << "Integralizing: [" << tS_int << "," << tF_int << "]\n";
+		// cout << "Integralizing: [" << tS_int << "," << tF_int << "]\n";
 	}	
 	///Removing end-block
 	if(tS_add <= T){
-		cout << "Adding to the model [" << tS_add << "," << tF_add << "]\n";
+		// cout << "Adding to the model [" << tS_add << "," << tF_add << "]\n";
 	}
 		
     ///Objective function	
@@ -2848,7 +2848,7 @@ void Model::improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const 
 		cplex.setParam(IloCplex::EpGap, gap/100);
 	int tS, tF;
     int totalIntervals = ceil(mIntervals*(1+overlap/100));
-
+    cout << "Total intervals " << totalIntervals << endl;
 	while(i <= totalIntervals){
 	   if(i==1){
 			tS = 1;				
@@ -2857,7 +2857,7 @@ void Model::improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const 
 			tS = ceil(inst.t/mIntervals*(i-1)*(1-overlap/100)+1);
 			tF = min(tS+inst.t/mIntervals-1, (double)inst.t);
 		}		
-		//~ cout << "Unfixing interval " << i << " = " << tS << "..." << tF << endl;
+		cout << "Unfixing interval " << i << " = " << tS << "..." << tF << endl;
 		unFixInterval(inst, tS, tF);
 		
 		optimize:
@@ -2877,7 +2877,7 @@ void Model::improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const 
 			//~ cout "Improved " << prevObj << " -> " << incumbent << endl;
 			prevObj = incumbent;			
 			if(i!=1){ //If is not the first iteration need to re-fix the interval				
-				//~ cout "Re-fixing " << tS << "..." << tF << endl;
+				// cout << "Re-fixing " << tS << "..." << tF << endl;
 				fixSolution(env, inst, tS, tF,0,true);
 				i=1;
 			}else{ //Continue optimizing first interval
@@ -3760,13 +3760,34 @@ double& incumbent, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, con
 	//~ cout << "Fixing vessel v1 and v2 " << v1 << " " << v2 << endl;
 	fixVesselPair(env,inst,v1,v2,false);
 }
+void Model::removeFeatures(Instance inst, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& tightenFlow){
+	int i,j,t,v;
+	int J = inst.numTotalPorts;
+	if(validIneq){
+		for(i=1;i<=J;i++){
+			if (inst.typePort[i-1] == 0){ 	//Loading port
+				model.remove(knapsack_P_1[i]);
+				model.remove(knapsack_P_2[i]);
+			}else{							//Discharging port
+				model.remove(knapsack_D_1[i]);
+				model.remove(knapsack_D_2[i]);
+				#ifndef WaitAfterOperate
+				model.remove(knapsack_D_3[i]);
+				#endif
+			}  
+		}				
+	}
+
+}
+
 /*
- * Note: 07-11-19 - parameter nIntervals corresponds to the number of time periods per interval
+ * Note: 07-11-19 - parameter timePerInterval corresponds to the number of time periods per interval
  */  
-void mirp::fixAndRelax(string file, string fixOptStr, const double& nIntervals, const double& gapFirst, const int& f, const double& overLap, const int& endBlock,
+void mirp::fixAndRelax(string file, string fixOptStr, const double& timePerInterval, const double& gapFirst, 
+const int& f, const double& overLap, const int& endBlock,
 const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSecond, const double& gapSecond,
- const double& overlap2, const double& timeLimit,  const bool& validIneq, const bool& addConstr, 
- const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceArcs, const bool& tightenFlow){
+const double& overlap2, const double& timeLimit,  const bool& validIneq, const bool& addConstr, 
+const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceArcs, const bool& tightenFlow){
 	///Time parameters
 	Timer<chrono::milliseconds> timer_cplex;
 	Timer<chrono::milliseconds> timer_global;
@@ -3790,23 +3811,22 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 	try{
 		Instance inst(env);
 		inst.readInstance(env, file);
-		inst.perturb(env,file,10);
+		// inst.perturb(env,file,10);
 				
 		int v, j, t, t1S, t1F, t2S, t2F, t3S, t3F;
 		int J = inst.numTotalPorts;
 		int T = inst.t;
 		int V = inst.speed.getSize(); //# of vessels        
-	
 		/// NEW MODEL		
 		Model model(env);
-		model.buildFixAndRelaxModel(env,inst, nIntervals, endBlock, validIneq, addConstr, tightenInvConstr, 
+		model.buildFixAndRelaxModel(env,inst, timePerInterval, endBlock, validIneq, addConstr, tightenInvConstr, 
 			proportionalAlpha, reduceArcs, tightenFlow);
 		model.setParameters(env, timePerIterFirst, gapFirst);
-        //~ model.cplex.exportModel("mip_R&F.lp");
+        
 		//Relax-and-fix
-		double p = nIntervals*(1-overLap/100); // Units of t that are add at each iteration to the model.
-		int s = T-(nIntervals*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
-		double sizeInterval = nIntervals;		 // Last t of integer block (always starting with 1 integer interval)		
+		double p = timePerInterval*(1-overLap/100); // Units of t that are add at each iteration to the model.
+		int s = T-(timePerInterval*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
+		double sizeInterval = timePerInterval;		 // Last t of integer block (always starting with 1 integer interval)		
         int maxIt = ceil((T-sizeInterval)/p);					
         
         //For write and reading a mst file
@@ -3828,7 +3848,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			#ifdef NRelaxation
 			for (v=1; v <= maxIt; v++){
 				timer_cplex.start();
-				//~ cout << "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
+				// cout << "Iteration: " << v << "/" << maxIt << " - Solving..." << endl;
 				if(!model.cplex.solve()){
 					//~ cout << model.cplex.getStatus() << endl;
 					opt_time += timer_cplex.total();
@@ -3852,7 +3872,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 				//~ //~ cout "Printing until time " << t2S-1 << endl;
 				//~ model.printSolution(env, inst, t2S-1);
 
-				model.modifyModel(env, inst, nIntervals, t3S, t3F, t2S, t2F, t1S, t1F, 
+				model.modifyModel(env, inst, timePerInterval, t3S, t3F, t2S, t2F, t1S, t1F, 
 					validIneq, addConstr, tightenInvConstr, proportionalAlpha, tightenFlow);
 				
 				#ifndef FixedGAP
@@ -3877,10 +3897,10 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			//~ //~ cout "Solution Status " << model.cplex.getStatus() << " Value: " << obj1stPhase << endl;
 			
 			//~ model.cplex.exportModel("mip_R&F.lp");
-			if(!abortedRF){
-				//~ cout << "Sucess!\n";
-				//~ model.printSolution(env, inst, T);
-				//~ model.cplex.writeMIPStarts(ss.str().c_str());
+			if(!abortedRF){ ///Print solution and create MIPStart
+				 // cout << "Sucess!\n";
+				 //model.printSolution(env, inst, T);
+				 // model.cplex.writeMIPStarts(ss.str().c_str());
 			}
 		}else{		
 			//~ cout << "Reading MST file...\n";
@@ -3895,6 +3915,10 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		//~ //~ cout "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
 		model.cplex.setParam(IloCplex::EpGap, 1e-04);	//Set default GAP
         model.fixAllSolution(env, inst);
+        
+        //Remove additional constraints and valid inequalities
+        model.removeFeatures(inst, validIneq, addConstr, tightenInvConstr, proportionalAlpha, tightenFlow);
+
 		double tLimit=timeLimit;
 		for(string::iterator it=fixOptStr.begin();it!=fixOptStr.end();++it){
 			tLimit = timeLimit;
@@ -3907,7 +3931,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 					time2ndPhase += elapsed_time;
 					break;
 				case 'b':
-					//~ cout << *it << " - Time Interval " << tLimit << "\n";
+					// cout << *it << " - Time Interval " << tLimit << "\n";
 					model.improvementPhaseVND_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
 						tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
 					time2ndPhase += elapsed_time;
@@ -3928,19 +3952,6 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			}
 		}		
 						
-        //~ model.improvementPhase_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        //~ timeLimit/3, elapsed_time, incumbent);
-                     
-        //~ tLimit = (timeLimit - elapsed_time/1000);//2;        
-        //~ //~ cout "Elapsed time: " << elapsed_time/1000 << " >> reaming: " << tLimit << endl;        
-		
-        //~ model.improvementPhase_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
-        //~ tLimit, elapsed_time, incumbent); 
-               
-        //~ model.improvementPhase_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, timeLimit, elapsed_time);
-        		
-        //~ model.warmStart(env,inst,timePerIterSecond*72);
-        
         ///SOMENTE NESCESSARIO PARA OBTENÇÃO DE SOLUÇÃO COMPLETA
         model.cplex.setParam(IloCplex::TiLim, 1);        
         model.cplex.solve();
@@ -3978,7 +3989,7 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 			#endif
 		}
 		
-		//~ model.printSolution(env, inst, T);
+		// model.printSolution(env, inst, T);
 		
 		#ifndef NBetas
 		//~ //~ cout "Total betas = " << totalBeta << endl;
@@ -3988,19 +3999,19 @@ const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSec
 		#endif
 		
         /// Data (header in the main method)
-        //~ cout << str << "\t" <<
-				//~ maxIt << "\t" << 
-				//~ time1stPhase/1000 << "\t" <<
-				//~ obj1stPhase << "\t" << 
-				//~ time2ndPhase/1000 << "\t" << 
-				//~ obj2ndPhase << "\t" << 
-				//~ opt_time/1000 << "\t" <<
-				//~ (global_time-opt_time)/1000 << "\t" <<
-				//~ abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
-				//~ isInfeasible << "\t" <<
-				//~ stopsByGap << "\t" <<
-				//~ stopsByTime << "\t" <<
-				//~ endl;
+   //      cout << str << "\t" <<
+			// maxIt << "\t" << 
+			// time1stPhase/1000 << "\t" <<
+			// obj1stPhase << "\t" << 
+			// time2ndPhase/1000 << "\t" << 
+			// obj2ndPhase << "\t" << 
+			// opt_time/1000 << "\t" <<
+			// (global_time-opt_time)/1000 << "\t" <<
+			// abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
+			// isInfeasible << "\t" <<
+			// stopsByGap << "\t" <<
+			// stopsByTime << "\t" <<
+			// endl;
 		///For iRace tests: <obj,time>
 		cout << obj1stPhase << " " << time1stPhase/1000 << endl;
 		///Local search

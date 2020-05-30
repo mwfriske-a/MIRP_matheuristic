@@ -26,12 +26,9 @@
 ##    condition is satisfied, FALSE otherwise.
 
 # 1:            2:                   3: 4:      5:
-nIntervals		"-n "				c	(3,5)
-#nIntervals		"-n "				c	(4,6)
-EndBlock		"-e "				c	(0,1,2,3)
-#EndBlock		"-e "				c	(0,1,2,3,4)
-overlap			"-o "				c	(10,25,50)
-initGap			"-g "				c	(50,25,5)
+EndBlock		"-e "				c	(0,1)
+overlap			"-o "				c	(0,10,25,50)
+initGap			"-g "				c	(50,25,5,0.001)
 validIneq		"-q "				i	(0,1)
 addConstr		"-c "				i	(0,1)
 tightenInv		"-d "				i	(0,1)	| EndBlock > 0

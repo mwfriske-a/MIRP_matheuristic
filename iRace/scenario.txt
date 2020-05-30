@@ -25,8 +25,7 @@ logFile = "./irace.Rdata"
 ## Directory where training instances are located; either absolute path or
 ## relative to current directory. If no trainInstancesFiles is provided,
 ## all the files in trainInstancesDir will be listed as instances.
-trainInstancesDir = "./trainingInstances/t45/"
-#trainInstancesDir = "./trainingInstances/t60/"
+trainInstancesDir = "./trainingInstances/"
 
 ## File that contains a list of training instances and optionally
 ## additional parameters for them. If trainInstancesDir is provided, irace
@@ -40,7 +39,7 @@ trainInstancesFile = "./instances-list.txt"
 ## File that contains a list of logical expressions that cannot be TRUE
 ## for any evaluated configuration. If empty or NULL, do not use forbidden
 ## expressions.
-forbiddenFile = "./forbidden.txt"
+#forbiddenFile = "./forbidden.txt"
 
 ## Script called for each configuration that executes the target algorithm
 ## to be tuned. See templates.
@@ -132,7 +131,7 @@ deterministic = 1
 
 ## Number of calls to targetRunner to execute in parallel. Values 0 or 1
 ## mean no parallelization.
-parallel = 6
+parallel = 15
 
 ## Enable/disable load-balancing when executing experiments in parallel.
 ## Load-balancing makes better use of computing resources, but increases

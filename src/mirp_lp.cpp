@@ -1015,7 +1015,7 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//~ cplex.setParam(IloCplex::MIPDisplay, 1); 
 	//~ cplex.setParam(IloCplex::MIPEmphasis, 4); // RINS
 	//~ cplex.setParam(IloCplex::DiveType, 3); // Guied dive
-	cplex.setParam(IloCplex::WorkMem, 8192);
+	//~ cplex.setParam(IloCplex::WorkMem, 8192);
 	cplex.setParam(IloCplex::NodeFileInd, 2);
 	cplex.setParam(IloCplex::WorkDir, "workDir/");
 	cplex.setParam(IloCplex::ClockType, 2);
@@ -1024,8 +1024,9 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	
 	//~ cplex.setParam(IloCplex::NodeLim, 1);
 	
-	if (gap > 1e-04)
+	if (gap > 1e-04){
 		cplex.setParam(IloCplex::EpGap, gap/100);
+	}
 	//~ cplex.setParam(IloCplex::IntSolLim, 1); //Set number of solutions which must be found before stopping
 	
 	//Define high priority on the branching vairables
@@ -1074,6 +1075,7 @@ void Model::addInventoryConstraints(Instance inst, IloEnv& env, bool& feasible){
 	}
 	cout << "Total of added constraints: " << count << endl;
 }
+
 void mirp::milp(string file, const double& timeLimit, string optStr){
 	///Time parameters
 	Timer<chrono::milliseconds> timer_cplex;

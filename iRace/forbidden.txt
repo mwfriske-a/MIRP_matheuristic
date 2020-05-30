@@ -1,4 +1,4 @@
-## Template for specifying forbidden parameter configurations in irace.
+## Template for specifying forbidden parameter configurations for irace.
 ##
 ## This filename must be specified via the --forbidden-file command-line option
 ## (or forbiddenFile in scenario.txt).
@@ -9,5 +9,5 @@
 ## then the configuration is discarded.
 ##
 ## Examples of valid logical operators are: ==  !=  >=  <=  >  <  &  |  !  %in%
-nIntervals == 3 & EndBlock > 1
-#nIntervals == 4 & EndBlock > 2
+#(sizeInterval > 5) && (EndBlock > 1)
+#(sizeInterval > 10) && (EndBlock > 0) 

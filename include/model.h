@@ -217,5 +217,6 @@ namespace mirp{
 		void improvementPhase_typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& stopsByGap,unsigned int& stopsByTime);
 		void warmStart(IloEnv env, Instance inst, const double& timePerIter);
 		void addInventoryConstraints(Instance inst, IloEnv& env, bool& feasible);
+		void removeFeatures(Instance inst, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& tightenFlow);
 	};
 }
