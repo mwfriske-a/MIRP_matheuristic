@@ -5,7 +5,7 @@
 //~ #define zero_cost 1.0e-6
 #define zero_cost 0
 #define DecPrecision 1.0e+14
-// #define NPrintPortPoints
+#define NPrintPortPoints
 
 typedef IloArray<IloNumArray> NumNumMatrix;
 typedef IloArray<IloIntArray> IntMatrix;

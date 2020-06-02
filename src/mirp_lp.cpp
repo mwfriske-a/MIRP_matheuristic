@@ -1016,8 +1016,8 @@ void Model::setParameters(IloEnv& env, const double& timeLimit, const double& ga
 	//~ cplex.setParam(IloCplex::MIPEmphasis, 4); // RINS
 	//~ cplex.setParam(IloCplex::DiveType, 3); // Guied dive
 	//~ cplex.setParam(IloCplex::WorkMem, 8192);
-	cplex.setParam(IloCplex::NodeFileInd, 2);
-	cplex.setParam(IloCplex::WorkDir, "workDir/");
+	// cplex.setParam(IloCplex::NodeFileInd, 2);
+	// cplex.setParam(IloCplex::WorkDir, "workDir/");
 	cplex.setParam(IloCplex::ClockType, 2);
 	cplex.setParam(IloCplex::TiLim, timeLimit);
 	//~ cplex.setParam(IloCplex::MIPEmphasis, 1); // 1 - Feasibility

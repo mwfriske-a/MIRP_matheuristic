@@ -3900,7 +3900,7 @@ const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceA
 			if(!abortedRF){ ///Print solution and create MIPStart
 				 // cout << "Sucess!\n";
 				 //model.printSolution(env, inst, T);
-				 // model.cplex.writeMIPStarts(ss.str().c_str());
+				 model.cplex.writeMIPStarts(ss.str().c_str());
 			}
 		}else{		
 			//~ cout << "Reading MST file...\n";
@@ -3999,21 +3999,21 @@ const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceA
 		#endif
 		
         /// Data (header in the main method)
-   //      cout << str << "\t" <<
-			// maxIt << "\t" << 
-			// time1stPhase/1000 << "\t" <<
-			// obj1stPhase << "\t" << 
-			// time2ndPhase/1000 << "\t" << 
-			// obj2ndPhase << "\t" << 
-			// opt_time/1000 << "\t" <<
-			// (global_time-opt_time)/1000 << "\t" <<
-			// abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
-			// isInfeasible << "\t" <<
-			// stopsByGap << "\t" <<
-			// stopsByTime << "\t" <<
-			// endl;
+        cout << str << "\t" <<
+			maxIt << "\t" << 
+			time1stPhase/1000 << "\t" <<
+			obj1stPhase << "\t" << 
+			time2ndPhase/1000 << "\t" << 
+			obj2ndPhase << "\t" << 
+			opt_time/1000 << "\t" <<
+			(global_time-opt_time)/1000 << "\t" <<
+			abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
+			isInfeasible << "\t" <<
+			stopsByGap << "\t" <<
+			stopsByTime << "\t" <<
+			endl;
 		///For iRace tests: <obj,time>
-		cout << obj1stPhase << " " << time1stPhase/1000 << endl;
+		// cout << obj1stPhase << " " << time1stPhase/1000 << endl;
 		///Local search
 		//~ cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
 		
