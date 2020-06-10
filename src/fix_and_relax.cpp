@@ -20,7 +20,7 @@
 #define NFixSinkArc
 
 //~ #define FixedGAP
-#define NImprovementPhase
+// #define NImprovementPhase
 #define NRandomTimeInterval				//Defined: Sequential selection of time intervals in the improvementPhase_timeIntervals, otherwise random selection
 
 #define PENALIZATION 1000
@@ -1423,7 +1423,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& time
 						}                    
 						#endif
 						model.add(flowCapacityOA[v][i][t]);
-						
+						// cout << ss7.str().c_str() << " " << flowCapacityOA[v][i][t].getUB() << endl;
 						if(t<tOEB && hasEnteringArc1st[v][i][t]==1){ //Constraints with no last time index
 							#ifndef WaitAfterOperate
 							ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
@@ -1450,7 +1450,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& time
 								//Equal for discharging and loading ports
 								flowMinCapacityWB[v][i][t] = IloRange(env, -IloInfinity, wB[v][i][t]*inst.f_min_jt[i-1][t-1]-fWB[v][i][t], 0, ss10_1.str().c_str());
 								model.add(flowMinCapacityWB[v][i][t]);
-								flowCapacityWB[v][i][t].setExpr(wB[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1])-fWB[v][i][t]);							
+								flowCapacityWB[v][i][t].setExpr(fWB[v][i][t] - wB[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));							
 							}
 							#endif
 							ss9 << "flowLimitW_"<<v<<","<<i<<","<<t;
@@ -2612,7 +2612,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& timePerInterval, 
 									flowMinCapacityOA[v][i][t] = IloRange(env, -IloInfinity, oA[v][i][t]*inst.f_min_jt[i-1][t-1]-fOA[v][i][t], 0, ss7_1.str().c_str());
 									model.add(flowMinCapacityOA[v][i][t]);
 								}else{ //Change upper bound for loading ports
-									flowCapacityOA.setExpr(fOA[v][i][t] - oA[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
+									flowCapacityOA[v][i][t].setExpr(fOA[v][i][t] - oA[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));
 								}
 							}
 							#endif
@@ -2627,8 +2627,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& timePerInterval, 
 								}
 							}   
 							#endif
-							model.add(flowCapacityOA[v][i][t]);
-							
+							model.add(flowCapacityOA[v][i][t]);							
 							if(t<tF_add){ //Constraints with no last time index
 								#ifndef WaitAfterOperate
 								ss8 << "flowLimitOB_"<<v<<","<<i<<","<<t;
@@ -2666,7 +2665,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& timePerInterval, 
 									//Equal for discharging and loading ports
 									flowMinCapacityWB[v][i][t] = IloRange(env, -IloInfinity, wB[v][i][t]*inst.f_min_jt[i-1][t-1]-fWB[v][i][t], 0, ss10_1.str().c_str());
 									model.add(flowMinCapacityWB[v][i][t]);
-									flowCapacityWB[v][i][t].setExpr(wB[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1])-fWB[v][i][t]);							
+									flowCapacityWB[v][i][t].setExpr(fWB[v][i][t] - wB[v][i][t]*(inst.q_v[v]-inst.f_min_jt[i-1][t-1]));							
 								}
 								#endif
 							}
@@ -2745,7 +2744,7 @@ void Model::modifyModel(IloEnv& env, Instance inst, const int& timePerInterval, 
 	///ending removing endblock
 
 }
-void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, 
+void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const double& intervalsA, 
     const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,
     float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent){
     double prevObj = 1.0e+10;
@@ -2759,7 +2758,7 @@ void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const dou
 	if (gap > 1e-04)
 		cplex.setParam(IloCplex::EpGap, gap/100);
 	int tS, tF;
-    int totalIntervals = ceil(mIntervals*(1+overlap/100));
+    int totalIntervals = ceil(intervalsA*(1+overlap/100));
     unsigned int itCount=1; //Count the macro iterarions and is used for feed the random seed 
     vector <unsigned int> interVector; //Used for selecting intervals at random without repetitions
     vector <pair <unsigned int,float> > intervalCoef;  // Controls the time coefficient according the evaluation of each interval <interval, coef>
@@ -2793,9 +2792,9 @@ void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const dou
             if(intervalNumber==1){
 				tS = 1;
 			}else{ //Considering the overlap for itrations > 1
-				tS = inst.t/mIntervals*(intervalNumber-1)*(1-overlap/100);
+				tS = inst.t/intervalsA*(intervalNumber-1)*(1-overlap/100);
 			}
-			tF = min(tS+inst.t/mIntervals, (double)inst.t);
+			tF = min(tS+inst.t/intervalsA, (double)inst.t);
 			//~ cout "Unfixing interval " << intervalNumber << " = " << tS << "..." << tF << endl;
 			unFixInterval(inst, tS, tF);
 	            //~ //~ cout "Solving...\n";
@@ -2835,7 +2834,7 @@ void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const dou
 /*
  * VND strategy: if solving an interval improved the solution, re-start the search from the first interval
  */
-void Model::improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const double& mIntervals, 
+void Model::improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const double& intervalsA, 
     const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,
     float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent,  
     unsigned int& stopsByGap,unsigned int& stopsByTime){
@@ -2847,15 +2846,15 @@ void Model::improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const 
 	if (gap > 1e-04)
 		cplex.setParam(IloCplex::EpGap, gap/100);
 	int tS, tF;
-    int totalIntervals = ceil(mIntervals*(1+overlap/100));
+    int totalIntervals = ceil(intervalsA*(1+overlap/100));
     cout << "Total intervals " << totalIntervals << endl;
 	while(i <= totalIntervals){
 	   if(i==1){
 			tS = 1;				
-			tF = ceil(inst.t/mIntervals);
+			tF = ceil(inst.t/intervalsA);
 		}else{ //Considering the overlap for itrations > 1
-			tS = ceil(inst.t/mIntervals*(i-1)*(1-overlap/100)+1);
-			tF = min(tS+inst.t/mIntervals-1, (double)inst.t);
+			tS = ceil(inst.t/intervalsA*(i-1)*(1-overlap/100)+1);
+			tF = min(tS+inst.t/intervalsA-1, (double)inst.t);
 		}		
 		cout << "Unfixing interval " << i << " = " << tS << "..." << tF << endl;
 		unFixInterval(inst, tS, tF);
@@ -3267,14 +3266,14 @@ void Model::fixVesselLessInterval(IloEnv env, Instance inst, const int& v, const
     }
 }
 
-void Model::improvementPhaseVND_intervalVessel(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, 
+void Model::improvementPhaseVND_intervalVessel(IloEnv& env, Instance inst, const double& intervalsA, const double& timePerIter, 
     const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, 
     const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& stopsByGap,unsigned int& stopsByTime){        		
 	double prevObj = incumbent;
 		
 	int V = inst.speed.getSize();    
     int i,v, tS, tF, totalIntervals;    
-    totalIntervals = ceil(mIntervals*(1+overlap/100));
+    totalIntervals = ceil(intervalsA*(1+overlap/100));
     
 	Timer<chrono::milliseconds> timer_LS;
 	timer_LS.start();	
@@ -3286,10 +3285,10 @@ void Model::improvementPhaseVND_intervalVessel(IloEnv& env, Instance inst, const
 		optmizeFromScratch:
 		if(i==1){
 			tS = 1;				
-			tF = ceil(inst.t/mIntervals);
+			tF = ceil(inst.t/intervalsA);
 		}else{ //Considering the overlap for itrations > 1
-			tS = ceil(inst.t/mIntervals*(i-1)*(1-overlap/100)+1);
-			tF = min(tS+inst.t/mIntervals-1, (double)inst.t);
+			tS = ceil(inst.t/intervalsA*(i-1)*(1-overlap/100)+1);
+			tF = min(tS+inst.t/intervalsA-1, (double)inst.t);
 		}
 		//~ cout << "Unfixing [" << tS << "..." << tF << "]" << endl;
         unFixInterval(inst, tS, tF);
@@ -3346,7 +3345,7 @@ void Model::improvementPhaseVND_intervalVessel(IloEnv& env, Instance inst, const
 		}			
 	}
 }
-void Model::improvementPhase_intervalVessel(IloEnv& env, Instance inst, const double& mIntervals, const double& timePerIter, 
+void Model::improvementPhase_intervalVessel(IloEnv& env, Instance inst, const double& intervalsA, const double& timePerIter, 
     const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, 
     const double& timeLimit, float& elapsed_time, double& incumbent){
         
@@ -3371,18 +3370,18 @@ void Model::improvementPhase_intervalVessel(IloEnv& env, Instance inst, const do
     float timeCoef = 0.3;    
     unsigned int sumIt = 1, rId, combId, vId;    
     vector <unsigned int> vesselsVector; // <v>  v = [0....V)
-    vector <float> combCoefVector(ceil(mIntervals)*V); // <coef>
+    vector <float> combCoefVector(ceil(intervalsA)*V); // <coef>
     fill(combCoefVector.begin(),combCoefVector.end(),1);
 	
 	while((prevObj - objValue >= 0.1) && elapsed_time/1000 <= timeLimit){
 		//~ //~ cout "prevObj - objValue = " << prevObj - objValue << endl;
         srand(sumIt++);
-        for(i=1;i<=ceil(mIntervals);i++){
+        for(i=1;i<=ceil(intervalsA);i++){
 			if(i==1)
 				tS = 1;
 			else
-				tS = inst.t/mIntervals*(i-1)*(1-overlap/100);
-			tF = min(tS+inst.t/mIntervals, (double)inst.t);
+				tS = inst.t/intervalsA*(i-1)*(1-overlap/100);
+			tF = min(tS+inst.t/intervalsA, (double)inst.t);
 			//~ //~ cout "Unfixing interval " << tS << "..." << tF << endl;
 			unFixInterval(inst, tS, tF);
             //~ for (v=0;v<V;v++){
@@ -3760,7 +3759,7 @@ double& incumbent, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, con
 	//~ cout << "Fixing vessel v1 and v2 " << v1 << " " << v2 << endl;
 	fixVesselPair(env,inst,v1,v2,false);
 }
-void Model::removeFeatures(Instance inst, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& tightenFlow){
+void Model::removeFeatures(Instance inst, const bool& validIneq, const bool& addConstr, const bool& tightenFlow){
 	int i,j,t,v;
 	int J = inst.numTotalPorts;
 	if(validIneq){
@@ -3777,17 +3776,62 @@ void Model::removeFeatures(Instance inst, const bool& validIneq, const bool& add
 			}  
 		}				
 	}
-
+	if(addConstr || tightenFlow){
+		for(v=0;v<inst.speed.getSize();v++){
+			for(i=1;i<=J;i++){
+				if(addConstr){
+					model.remove(operateAndDepart[v][i]);
+				}
+				if(tightenFlow){
+					model.remove(flowMinCapacityOA[v][i]);
+					#ifndef WaitAfterOperate
+					model.remove(flowMinCapacityOB[v][i]);
+					#endif
+					model.remove(flowMinCapacityW[v][i]);
+					#ifdef WaitAfterOperate
+					model.remove(flowMinCapacityWB[v][i]);
+					#endif
+					for(t=1;t<=inst.t;t++){
+						if(hasEnteringArc1st[v][i][t]==1){
+							//Reset upper bounds
+							#ifdef WaitAfterOperate
+							if(inst.typePort[i-1]==0){//Loading ports								
+								flowCapacityOA[v][i][t].setExpr(fOA[v][i][t] - z[v][i][t]*inst.q_v[v]);
+								if(t<inst.t){
+									flowCapacityW[v][i][t].setExpr(fW[v][i][t]-w[v][i][t]*inst.q_v[v]);
+								}
+							}
+							//For both L/D ports
+							if(t<inst.t){
+								flowCapacityWB[v][i][t].setExpr(fWB[v][i][t]-wB[v][i][t]*inst.q_v[v]);
+							}
+							#endif
+						}
+					}
+					for(j=1;j<=J;j++){
+						if(i != j){
+							model.remove(flowMinCapacityX[v][i][j]);
+						}
+						for(t=0;t<=inst.t;t++){
+							if(hasArc[v][i][j][t]==1){
+								flowCapacityX[v][i][j][t].setExpr(fX[v][i][j][t] - inst.q_v[v]*x[v][i][j][t]);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 /*
  * Note: 07-11-19 - parameter timePerInterval corresponds to the number of time periods per interval
  */  
-void mirp::fixAndRelax(string file, string fixOptStr, const double& timePerInterval, const double& gapFirst, 
-const int& f, const double& overLap, const int& endBlock,
-const int& timePerIterFirst, const double& mIntervals, const int& timePerIterSecond, const double& gapSecond,
-const double& overlap2, const double& timeLimit,  const bool& validIneq, const bool& addConstr, 
-const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceArcs, const bool& tightenFlow){
+void mirp::fixAndRelax(string file, const double& timePerInterval, const int& endBlock, const double& overLap, const double& gapFirst, 
+const int& timePerIterFirst,  const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, 
+const bool& proportionalAlpha, const bool& reduceArcs, const bool& tightenFlow, string fixOptStr, const double& intervalsA, 
+const double& intervalsB, const double& overlapA, const double& overlapB, const int& timePerIterSecond, const double& timeLimit, 
+const double& gapSecond){
 	///Time parameters
 	Timer<chrono::milliseconds> timer_cplex;
 	Timer<chrono::milliseconds> timer_global;
@@ -3844,7 +3888,7 @@ const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceA
 		//ss << "msts_only_PropAlpha/" << str << "_" << inst.t << ".mst";
 
 		timer_1stPhase.start();
-        if(mIntervals == 0){
+        // if(intervalsA == 0){
 			#ifdef NRelaxation
 			for (v=1; v <= maxIt; v++){
 				timer_cplex.start();
@@ -3876,7 +3920,7 @@ const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceA
 					validIneq, addConstr, tightenInvConstr, proportionalAlpha, tightenFlow);
 				
 				#ifndef FixedGAP
-				double newGap = max(0.001, (gapFirst - gapFirst/maxIt*v)/100);
+				double newGap = max(0.0001, (gapFirst - gapFirst/maxIt*v)/100);
 				//~ cout << "New GAP " << newGap*100 << " % \n \n";
 				model.cplex.setParam(IloCplex::EpGap, newGap);            
 				#endif
@@ -3900,16 +3944,16 @@ const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceA
 			if(!abortedRF){ ///Print solution and create MIPStart
 				 // cout << "Sucess!\n";
 				 //model.printSolution(env, inst, T);
-				 model.cplex.writeMIPStarts(ss.str().c_str());
+				 // model.cplex.writeMIPStarts(ss.str().c_str());
 			}
-		}else{		
-			//~ cout << "Reading MST file...\n";
-			model.cplex.readMIPStarts(ss.str().c_str());
-			model.cplex.setParam(IloCplex::TiLim, 1);        
-			model.cplex.solve(); 
-			obj1stPhase = model.cplex.getObjValue();       
-        }
-        double incumbent = obj1stPhase;
+		// }else{		
+			//~ cout << "Reading MST file...\n";				//Uncomments this and the 6 lines below for testing R&F individually
+			// model.cplex.readMIPStarts(ss.str().c_str());
+			// model.cplex.setParam(IloCplex::TiLim, 1);        
+			// model.cplex.solve(); 
+			// obj1stPhase = model.cplex.getObjValue();       
+        // }
+        // double incumbent = obj1stPhase;
         unsigned int stopsByGap=0, stopsByTime=0;
         #ifndef NImprovementPhase	
 		//~ //~ cout "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
@@ -3917,8 +3961,10 @@ const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceA
         model.fixAllSolution(env, inst);
         
         //Remove additional constraints and valid inequalities
-        model.removeFeatures(inst, validIneq, addConstr, tightenInvConstr, proportionalAlpha, tightenFlow);
-
+        cout << "Removing Valid inequalities, additional constraints and others \n";        
+        model.cplex.exportModel("mipBefore.lp");
+        model.removeFeatures(inst, validIneq, addConstr, tightenFlow);        
+        model.cplex.exportModel("mipAfter.lp");
 		double tLimit=timeLimit;
 		for(string::iterator it=fixOptStr.begin();it!=fixOptStr.end();++it){
 			tLimit = timeLimit;
@@ -3926,13 +3972,13 @@ const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& reduceA
 			switch(*it){
 				case 'a':
 					//~ cout << *it << " - Interval Vessels " << tLimit << "\n";
-					model.improvementPhaseVND_intervalVessel(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+					model.improvementPhaseVND_intervalVessel(env, inst, intervalsA, timePerIterSecond, gapSecond, overlapA, timer_cplex, opt_time, 
 						tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
 					time2ndPhase += elapsed_time;
 					break;
 				case 'b':
-					// cout << *it << " - Time Interval " << tLimit << "\n";
-					model.improvementPhaseVND_timeIntervals(env, inst, mIntervals, timePerIterSecond, gapSecond, overlap2, timer_cplex, opt_time, 
+					cout << *it << " - Time Interval " << tLimit << "\n";
+					model.improvementPhaseVND_timeIntervals(env, inst, intervalsB, timePerIterSecond, gapSecond, overlapB, timer_cplex, opt_time, 
 						tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
 					time2ndPhase += elapsed_time;
 					break;

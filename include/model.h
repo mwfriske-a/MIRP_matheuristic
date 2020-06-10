@@ -16,12 +16,11 @@ namespace mirp{
 	
 	void milp(string file, const double& timeLimit, string optStr);
 	
-	void fixAndRelax(string file, string optStr, const double& nIntervals, const double& gapFirst,
-	 const int& f, const double& overLap, const int& endBlockFirst, const int& timePerIter, 
-	 const double& mIntervals, const int& timePerIter2, const double& gapSecond, 
-	 const double& overlap2,const double& timeLimit,
-	 const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha,
-	 const bool& instanceSimplify, const bool& tightenFlow);
+	void fixAndRelax(string file, const double& timePerInterval, const int& endBlock, const double& overLap, const double& gapFirst, 
+	const int& timePerIterFirst,  const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, 
+	const bool& proportionalAlpha, const bool& reduceArcs, const bool& tightenFlow, string fixOptStr, const double& intervalsA, 
+	const double& intervalsB, const double& overlapA, const double& overlapB, const int& timePerIterSecond, const double& timeLimit, 
+	const double& gapSecond);
 	
 	void fixAndRelaxH( string file, string optStr, const double& gapFirst, const int& outVessels, const int& timeLimitFirst, 
 	const double& mIntervals, const int& timeLimitSecond, const double& gapSecond,const double& overlap2);
@@ -217,6 +216,6 @@ namespace mirp{
 		void improvementPhase_typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap,Timer<chrono::milliseconds>& timer_cplex, float& opt_time, const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& stopsByGap,unsigned int& stopsByTime);
 		void warmStart(IloEnv env, Instance inst, const double& timePerIter);
 		void addInventoryConstraints(Instance inst, IloEnv& env, bool& feasible);
-		void removeFeatures(Instance inst, const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, const bool& proportionalAlpha, const bool& tightenFlow);
+		void removeFeatures(Instance inst, const bool& validIneq, const bool& addConstr, const bool& tightenFlow);
 	};
 }
