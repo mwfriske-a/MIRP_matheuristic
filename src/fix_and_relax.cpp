@@ -59,11 +59,20 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& time
 	int timePerIntervalId = timePerInterval; //Number of time periods in each interval
 	int J = inst.numTotalPorts;
 	int T = inst.t+1;
-	double intPart;
-	int tOEB = inst.t - (timePerIntervalId*max(0.0,endBlock-modf(timePerInterval, &intPart))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
+	double intPart;	
+	// int tOEB = inst.t - (timePerIntervalId*max(0.0,endBlock-modf(timePerInterval, &intPart))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
+	int tOEB;
+	if(modf(inst.t/timePerInterval,&intPart) > 0.0){ //One interval has less time periods than the remainder
+		tOEB = inst.t - (timePerIntervalId*max(0.0,min(modf(inst.t/timePerInterval,&intPart)+endBlock-1,(double)endBlock))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
+	}else{
+		tOEB = inst.t - (timePerIntervalId*endBlock);
+	}
+
 	int V = inst.speed.getSize(); //# of vessels
     int N = J + 2;
-	// cout << "Building model...\n Integer Block: [0," << timePerIntervalId << "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB << "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
+	// cout << "Building model...\n Integer Block: [0," << timePerIntervalId
+	//  << "]\n Relaxed block: [" << timePerIntervalId+1 << "," << tOEB 
+	//  << "]\n End block: [" << tOEB+1 << "," << T-1 << "]\n";
 	
     ///Variables, converters and arrays to storage the values
     #ifndef NAlpha
@@ -2847,7 +2856,7 @@ void Model::improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const 
 		cplex.setParam(IloCplex::EpGap, gap/100);
 	int tS, tF;
     int totalIntervals = ceil(intervalsA*(1+overlap/100));
-    cout << "Total intervals " << totalIntervals << endl;
+    // cout << "Total intervals " << totalIntervals << endl;
 	while(i <= totalIntervals){
 	   if(i==1){
 			tS = 1;				
@@ -2856,7 +2865,7 @@ void Model::improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const 
 			tS = ceil(inst.t/intervalsA*(i-1)*(1-overlap/100)+1);
 			tF = min(tS+inst.t/intervalsA-1, (double)inst.t);
 		}		
-		cout << "Unfixing interval " << i << " = " << tS << "..." << tF << endl;
+		// cout << "Unfixing interval " << i << " = " << tS << "..." << tF << endl;
 		unFixInterval(inst, tS, tF);
 		
 		optimize:
@@ -3827,9 +3836,9 @@ void Model::removeFeatures(Instance inst, const bool& validIneq, const bool& add
 /*
  * Note: 07-11-19 - parameter timePerInterval corresponds to the number of time periods per interval
  */  
-void mirp::fixAndRelax(string file, const double& timePerInterval, const int& endBlock, const double& overLap, const double& gapFirst, 
-const int& timePerIterFirst,  const bool& validIneq, const bool& addConstr, const bool& tightenInvConstr, 
-const bool& proportionalAlpha, const bool& reduceArcs, const bool& tightenFlow, string fixOptStr, const double& intervalsA, 
+void mirp::fixAndRelax(string file, const double& timePerInterval, const int& endBlockS, const double& overLap, const double& gapFirst, 
+const int& timePerIterFirst,  const bool& validIneq, const bool& addConstr, const bool& tightenInvConstrS, 
+const bool& proportionalAlphaS, const bool& reduceArcs, const bool& tightenFlow, string fixOptStr, const double& intervalsA, 
 const double& intervalsB, const double& overlapA, const double& overlapB, const int& timePerIterSecond, const double& timeLimit, 
 const double& gapSecond){
 	///Time parameters
@@ -3844,7 +3853,6 @@ const double& gapSecond){
 	bool abortedRF = false;
 	
 	double obj1stPhase = 0, obj2ndPhase = 0, time1stPhase=0, time2ndPhase=0, intPart;
-	
 	///Read input files
 	IloEnv env;
 	
@@ -3860,7 +3868,18 @@ const double& gapSecond){
 		int v, j, t, t1S, t1F, t2S, t2F, t3S, t3F;
 		int J = inst.numTotalPorts;
 		int T = inst.t;
-		int V = inst.speed.getSize(); //# of vessels        
+		int V = inst.speed.getSize(); //# of vessels
+
+		//Automatic parametrization
+		int endBlock = min((double)endBlockS,ceil(inst.t/timePerInterval)-2);	        
+		bool tightenInvConstr, proportionalAlpha;
+		if(endBlock>0){
+			tightenInvConstr = tightenInvConstrS;
+			proportionalAlpha = proportionalAlphaS;
+		}else{
+			tightenInvConstr = false;
+			proportionalAlpha = false;
+		}
 		/// NEW MODEL		
 		Model model(env);
 		model.buildFixAndRelaxModel(env,inst, timePerInterval, endBlock, validIneq, addConstr, tightenInvConstr, 
@@ -3869,7 +3888,16 @@ const double& gapSecond){
         
 		//Relax-and-fix
 		double p = timePerInterval*(1-overLap/100); // Units of t that are add at each iteration to the model.
-		int s = T-(timePerInterval*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
+		// int s = T-(timePerInterval*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
+		double intPart;
+		int s;
+		if(modf(inst.t/timePerInterval,&intPart) > 0.0){ //When the last interval has less time periods
+			s = T-(timePerInterval*max(0.0,min(modf(inst.t/timePerInterval,&intPart)+endBlock-1,(double)endBlock))); 		 // Last t (relaxed) of model when starting relax-and-fix.
+		}else{//when all intervals have the same size
+			s = T-(timePerInterval*max(0.0,(double)endBlock)); 		 // Last t (relaxed) of model when starting relax-and-fix.
+		}
+			 
+		// int tOEB = inst.t - (timePerIntervalId*max(0.0,min(modf(inst.t/timePerInterval,&intPart)+endBlock-1,(double)endBlock))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
 		double sizeInterval = timePerInterval;		 // Last t of integer block (always starting with 1 integer interval)		
         int maxIt = ceil((T-sizeInterval)/p);					
         
@@ -3904,12 +3932,15 @@ const double& gapSecond){
 				opt_time += timer_cplex.total();
 				//~ cout "Solution Status " << model.cplex.getStatus() << " Value: " << model.cplex.getObjValue() << endl;
 								
+				//Fixing times
 				t3S = ceil(sizeInterval * (v-1) * (1-overLap/100))+1;
 				t3F = min(ceil(sizeInterval * v * (1-overLap/100)),(double)T);
 
+				//Add times
 				t2S = ceil(s+p*(v-1))+1;
 				t2F = min(ceil(s+p*v), (double)T); 
 
+				//Re-integralize
 				t1S = ceil(sizeInterval+p*(v-1)+1);
 				t1F = min(ceil(sizeInterval+p*v),(double)T); 
 
@@ -3961,10 +3992,10 @@ const double& gapSecond){
         model.fixAllSolution(env, inst);
         
         //Remove additional constraints and valid inequalities
-        cout << "Removing Valid inequalities, additional constraints and others \n";        
-        model.cplex.exportModel("mipBefore.lp");
+        // cout << "Removing Valid inequalities, additional constraints and others \n";        
+        // model.cplex.exportModel("mipBefore.lp");
         model.removeFeatures(inst, validIneq, addConstr, tightenFlow);        
-        model.cplex.exportModel("mipAfter.lp");
+        // model.cplex.exportModel("mipAfter.lp");
 		double tLimit=timeLimit;
 		for(string::iterator it=fixOptStr.begin();it!=fixOptStr.end();++it){
 			tLimit = timeLimit;
@@ -3977,7 +4008,7 @@ const double& gapSecond){
 					time2ndPhase += elapsed_time;
 					break;
 				case 'b':
-					cout << *it << " - Time Interval " << tLimit << "\n";
+					// cout << *it << " - Time Interval " << tLimit << "\n";
 					model.improvementPhaseVND_timeIntervals(env, inst, intervalsB, timePerIterSecond, gapSecond, overlapB, timer_cplex, opt_time, 
 						tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
 					time2ndPhase += elapsed_time;
@@ -4045,23 +4076,23 @@ const double& gapSecond){
 		#endif
 		
         /// Data (header in the main method)
-        cout << str << "\t" <<
-			maxIt << "\t" << 
-			time1stPhase/1000 << "\t" <<
-			obj1stPhase << "\t" << 
-			time2ndPhase/1000 << "\t" << 
-			obj2ndPhase << "\t" << 
-			opt_time/1000 << "\t" <<
-			(global_time-opt_time)/1000 << "\t" <<
-			abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
-			isInfeasible << "\t" <<
-			stopsByGap << "\t" <<
-			stopsByTime << "\t" <<
-			endl;
+        // cout << str << "\t" <<
+			// maxIt << "\t" << 
+			// time1stPhase/1000 << "\t" <<
+			// obj1stPhase << "\t" << 
+			// time2ndPhase/1000 << "\t" << 
+			// obj2ndPhase << "\t" << 
+			// opt_time/1000 << "\t" <<
+			// (global_time-opt_time)/1000 << "\t" <<
+			// abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
+			// isInfeasible << "\t" <<
+			// stopsByGap << "\t" <<
+			// stopsByTime << "\t" <<
+			// endl;
 		///For iRace tests: <obj,time>
 		// cout << obj1stPhase << " " << time1stPhase/1000 << endl;
 		///Local search
-		//~ cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
+		cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
 		
         #endif
         

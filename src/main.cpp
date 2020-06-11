@@ -100,19 +100,19 @@ int main(const int argc, char** argv) {
 			break;					
 		case 2: 
 			//Header
-			cout << "Instance\t"  <<
-					"Iter(RF)\t"  <<
-					"Time(RF)\t"  <<
-					"Obj(RF)\t"   <<
-					"Time(FO)\t"  <<
-					"Obj(FO)\t"   << 
-					"CPX time\t"  << 
-					"Otr time \t" << 
-					"Impr \%\t"   << 
-					"Inf\t"		  <<				
-					"Stop by gap\t" <<
-					"Stop by time\t" <<
-					endl;
+			// cout << "Instance\t"  <<
+					// "Iter(RF)\t"  <<
+					// "Time(RF)\t"  <<
+					// "Obj(RF)\t"   <<
+					// "Time(FO)\t"  <<
+					// "Obj(FO)\t"   << 
+					// "CPX time\t"  << 
+					// "Otr time \t" << 
+					// "Impr \%\t"   << 
+					// "Inf\t"		  <<				
+					// "Stop by gap\t" <<
+					// "Stop by time\t" <<
+					// endl;
 	        #ifndef NTestInstanceSet
 	        for(int i=0;i<instances.size();i++){
 	            mirp::fixAndRelax(instances[i], nIntervals, endBlock, overLap, gapFirst, timePerIterFirst, 
