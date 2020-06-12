@@ -2,59 +2,50 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
-#include <boost/program_options.hpp>
 #include "../include/util.h"
 #include "../include/model.h"
 
 #define NTestInstanceSet
 using namespace std;
-namespace po = boost::program_options;
+
 
 int main(const int argc, char** argv) {
-	 try {	 	
-	 	string file;
-		string fixOptStr;
-		int modelId;
-		double timeLimit, gapFirst, gapSecond, overLap, intervalsA, intervalsB, nIntervals, overlapA, overlapB;
-		int opt, endBlock, outVessel, timePerIterFirst, timePerIterSecond;
-		bool validIneq, addConstr, tightenInvConstr, proportionalAlpha, reduceArcs, tightenFlow;
-        po::options_description desc("Allowed options");
-        desc.add_options()
-            ("help", "Produce help message")
-            ("version,V", po::value<int>(&modelId), "Relax-and-fix (R&F) version (1 - for MILP; 2- for fix-and-relax vertically; 3-fix-and-relax horizontally)")
-            ("path,P", po::value<string>(&file), "Path to the instance file")
-            
-            ("sizeInterval,N", po::value<double>(&nIntervals), "Number of time periods per interval")
-            ("endBlock,E", po::value<int>(&endBlock)->default_value(0), "Number of intervals initially at the endblock (default 0)")
-            ("overlapRf,O", po::value<double>(&overLap)->default_value(0), "Overlap between intervals in the R&F iterations (default 0)")
-            ("gap,G", po::value<double>(&gapFirst)->default_value(0.0001), "Initial GAP at the first iteration (default 0.0001)")
-            ("timeItRf,L", po::value<int>(&timePerIterFirst), "Time limit per iteration of R&F")
-
-            ("addConst,C", po::value<bool>(&addConstr)->default_value(0), "Use additional constraints (1) (default 0 - do not use)")
-            ("validIneq,Q", po::value<bool>(&validIneq)->default_value(0), "Use valid inequalities (1) (default 0 - do not use)")
-            ("tightInventory,D", po::value<bool>(&tightenInvConstr)->default_value(0), "(For endblock > 0) Use tight inventory constraints (1) (default 0 - do not use)")
-            ("propAlpha", po::value<bool>(&proportionalAlpha)->default_value(0), "(For endblock > 0) Use proportional alpha limits (1) (default 0 - do not use)")
-            ("reducedArc", po::value<bool>(&reduceArcs)->default_value(1), "Ignore inter-regional arcs between ports of the same type (default 1) ")
-            ("tightFlow", po::value<bool>(&tightenFlow)->default_value(0), "Use thight a flow by adding new constraints (default 0 - do not use)")
-
-			("fixOpt", po::value<string>(&fixOptStr), "Order and fix-and-optmize procedures used: A - Vessel time intervals; B - Time Intervals; C - Vessels Pairs; D - Port Regions")
-			("numintervalsA", po::value<double>(&intervalsA)->default_value(1), "Number of intervals in the Fix-and-optimize A: Interval Vessel (default 1)")
-			("numintervalsB", po::value<double>(&intervalsB)->default_value(1), "Number of intervals in the Fix-and-optimize B: Time intervals (default 1)")
-			("overlapA", po::value<double>(&overlapA)->default_value(0), "Overlap between intervals in the Fix-and-optimize A: Interval Vessel (default 0)")
-			("overlapB", po::value<double>(&overlapB)->default_value(0), "Overlap between intervals in the Fix-and-optimize B: Time intervals (default 0)")
-			("timeItFo",po::value<int>(&timePerIterSecond)->default_value(0), "Time limit per Fix-and-optimize iteration (default 0)")
-			("timeFo",po::value<double>(&timeLimit)->default_value(0), "Time limit per Fix-and-optimize procedure (default 0)")
-			("gaoFo",po::value<double>(&gapSecond)->default_value(0.0001), "Gap considered for fix-and-optimize (default 0.0001)")
-
-        ;
-        po::variables_map vm;        
-        po::store(po::parse_command_line(argc, argv, desc), vm);
-        po::notify(vm);    
-
-        if (vm.count("help")) {
-            cout << desc << "\n";
-            return 0;
-        }      	    
+	 if (argc < 7) {
+		cout << "Error! At least 4 parameters must be defined" << endl;	
+	 }
+	stringstream ss;
+	ss << "usuage is \n -v : Version (1 - for MILP; 2- for fix-and-relax vertically; 3-fix-and-relax horizontally) \n " 
+		<< "-p : instance path \n " 
+		<< "-t : time limit in seconds - for -v = 2, corresponds to timelimit of local searches \n " 
+		
+		<< "-q : 1 if use valid inequalities,0 otherwise \n"
+		<< "-c : 1 if use additional constraints, 0 otherwise \n"
+		<< "-d : 1 if use tightening of inventory contraints, 0 otherwise (only when e > 0) \n"
+		<< "-k : 1 if use of proportional alphaMaxJ, 0 otherwise (only when e > 0) \n"
+		<< "-z : 1 if simplify instance, 0 otherwise \n"
+		<< "-b : 1 if bounds on flow fOB(fWB) and fX are tighten\n"
+		
+		<< "For -v = {2,3} (Fix and relax algorithm):\n " 
+		<< "-n : Number of intervals in the first phase (-v =2) \n "
+		<< "-g : Initial GAP for solving the first phase (-v = 2,3) \n"
+		<< "-f : Number of intervals that leaves the end block in each iteration (-v =2) \n "
+		<< "-o : percentage of overlapping between the fixed and the integer interval (-v =2) \n "
+		<< "-e : Size of the end block/vessels out of model (must be at most n-2) \n "
+		<< "-s : A string defining the fix-and-optimize procedures and their order to be used in the second phase \n" 
+		<< "-r : Vessels out of model (must be at most v-2) \n "
+		<< "-l : Time limit for solving each interval \n "
+		<< "-m : Number of intervals in the Fix-and-optimize A: Interval Vessel \n "
+		<< "-y : Number of intervals in the Fix-and-optimize B: Time intervals \n "
+		<< "-i : Time limit for one loop in the improvement phase \n "
+		<< "-h : Fixed GAP in the imnprovement phase \n "
+		<< "-u : Overlap between intervals in the Fix-and-optimize A: Interval Vessel \n "
+		<< "-w : Overlap between intervals in the Fix-and-optimize B: Time interval \n ";
+	int modelId;
+	stringstream file;
+	string fixOptStr;
+	double timeLimit, gapFirst, gapSecond, overLap, intervalsA, intervalsB, nIntervals, overlapA, overlapB;
+	int opt, endBlock, outVessel, timePerIterFirst, timePerIterSecond;
+	bool validIneq, addConstr, tightenInvConstr, proportionalAlpha, reduceArcs, tightenFlow; 	     	    
 
 	vector <string> instances;
 	instances.push_back("../Group1_data_format_only_files/LR1_1_DR1_3_VC1_V7a/");
@@ -86,11 +77,84 @@ int main(const int argc, char** argv) {
 	// instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR2_22_VC3_V10a/");
 	// instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V14a/");
 	// instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V17a/");
-	
-	 switch (modelId){
+	while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:b:n:g:o:e:r:l:m:i:h:u:w:y:")) != EOF)
+	switch(opt)
+	{
+		case 'v': 
+			modelId = atoi(optarg);
+			break;
+		case 'p':
+			file << optarg;
+			break;
+		case 't': 
+			 timeLimit = stod(optarg);
+			break;		
+		case 's':
+			fixOptStr = optarg;
+			break;
+		case 'q':
+			validIneq = atoi(optarg);
+			break;			
+		case 'c':
+			addConstr = atoi(optarg);
+			break;
+		case 'd':
+			tightenInvConstr = atoi(optarg);
+			break;
+		case 'k':
+			proportionalAlpha = atoi(optarg);
+			break;
+		case 'z':
+			reduceArcs = atoi(optarg);
+			break;
+		case 'b':
+			tightenFlow = atoi(optarg);
+			break;
+		case 'n':
+			nIntervals = stod(optarg);
+			break;		
+		case 'g':
+			gapFirst = stod(optarg);
+			break;
+		case 'o':
+			overLap = stod(optarg);
+			break;
+		case 'w':
+			overlapB = stod(optarg);
+			break;
+		case 'y':
+			intervalsB = stod(optarg);
+			break;
+		case 'e':
+			endBlock = atoi(optarg);
+			break;
+		case 'r':
+			outVessel = atoi(optarg);
+			break;
+		case 'l':
+			timePerIterFirst = atoi(optarg);
+			break;
+		case 'm':
+			intervalsA = stod(optarg);
+			break;
+		case 'i':
+			timePerIterSecond = atoi(optarg);
+			break;
+		case 'h':
+			gapSecond = stod(optarg);
+			break;
+		case 'u':
+			overlapA = stod(optarg);
+			break;
+		case '?': 
+			fprintf(stderr, ss.str().c_str());
+			break;
+		default: cout<<endl; abort();
+	}
+	switch (modelId){
 		case 1: 
 			#ifdef NTestInstanceSet
-			mirp::milp(file, timeLimit, fixOptStr);			
+			mirp::milp(file.str(), timeLimit, fixOptStr);			
 			#endif
 			#ifndef NTestInstanceSet
 	        for(int i=0;i<instances.size();i++){
@@ -121,7 +185,7 @@ int main(const int argc, char** argv) {
 	        }	        
 	        #endif
 	        #ifdef NTestInstanceSet
-	        mirp::fixAndRelax(file, nIntervals, endBlock, overLap, gapFirst, timePerIterFirst, 
+	        mirp::fixAndRelax(file.str(), nIntervals, endBlock, overLap, gapFirst, timePerIterFirst, 
 					validIneq, addConstr, tightenInvConstr,	proportionalAlpha, reduceArcs, tightenFlow, 
 					fixOptStr, intervalsA, intervalsB, overlapA, overlapB, timePerIterSecond, timeLimit, gapSecond);
 	        #endif
@@ -135,15 +199,7 @@ int main(const int argc, char** argv) {
 		default: 
 			cout << "Error, no Model with index " << modelId << " was not found!"<< endl;
 			break;
- 	} 
- 	}	
-    catch(exception& e) {
-        cerr << "error: " << e.what() << "\n";
-        return 1;
-    }
-    catch(...) {
-        cerr << "Exception of unknown type!\n";
-    }
+ 	} 	
  
-return 0;
+	return 0;
 }

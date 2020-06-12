@@ -26,17 +26,17 @@
 ##    condition is satisfied, FALSE otherwise.
 
 # 1:            2:                   3: 4:      5:
-sizeInterval    "--sizeInterval "   c   (5,10,15,20)
-endBlock		"--endBlock "		c	(0,1,2,3,4,5,6,7,8,9,10)
-overlapRf		"--overlapRf "		c	(0,10,25,50)
-gap 			"--gap "			c	(50,25,5,0.0001)
-addConst		"--addConst "		i	(0,1)
-validIneq		"--validIneq "		i	(0,1)
-tightInventory	"--tightInventory "	i	(0,1)	| endBlock > 0
-propAlpha		"--propAlpha "		i	(0,1)	| endBlock > 0
-tightFlow		"--tightFlow "		i	(0,1)
-fixOpt          "--fixOpt "         c	("a","b","c","d", "ab","ac","ad", "abc","abd", "acb","acd", "adb","adc", "abcd","abdc","acbd","acdb","adbc","adcb", "ba","bc","bd","bac","bca", "bad","bda", "bcd","bdc","bacd","badc","bcad","bcda","bdac","bdca", "ca","cb","cd", "cab","cba","cad","cda", "cbd","cdb","cabd","cadb","cbad","cbda","cdab","cdba", "da","db","dc", "dab", "dba", "dac", "dca", "dbc","dcb", "dabc","dacb","dbac","dbca","dcab","dcba")
-numintervalsA   "--numintervalsA "  c   (2,3)
-numintervalsB   "--numintervalsB "  c   (2,3)
-overlapA        "--overlapA "       c   (0,25,50)
-overlapB        "--overlapB "       c   (0,25,50)   
+sizeInterval    "-n "               c   (5,10,15,20)
+endBlock		"-e "         		c	(0,1,2,3,4,5,6,7,8,9,10)
+overlapRf		"-o "	          	c	(0,10,25,50)
+gap 			"-g "    			c	(50,25,5,0.0001)
+addConst		"-c "         		i	(0,1)
+validIneq		"-q "        		i	(0,1)
+tightInventory	"-d "	            i	(0,1)	| endBlock > 0
+propAlpha		"-k "        		i	(0,1)	| endBlock > 0
+tightFlow		"-b "        		i	(0,1)
+fixOpt          "-s "               c	("a","b","c","d", "ab","ac","ad", "abc","abd", "acb","acd", "adb","adc", "abcd","abdc","acbd","acdb","adbc","adcb", "ba","bc","bd","bac","bca", "bad","bda", "bcd","bdc","bacd","badc","bcad","bcda","bdac","bdca", "ca","cb","cd", "cab","cba","cad","cda", "cbd","cdb","cabd","cadb","cbad","cbda","cdab","cdba", "da","db","dc", "dab", "dba", "dac", "dca", "dbc","dcb", "dabc","dacb","dbac","dbca","dcab","dcba")
+numintervalsA   "-m "               c   (2,3)
+numintervalsB   "-y "               c   (2,3)
+overlapA        "-u "               c   (0,25,50)
+overlapB        "-w "               c   (0,25,50)   

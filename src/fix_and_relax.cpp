@@ -2846,7 +2846,7 @@ void Model::improvementPhase_timeIntervals(IloEnv& env, Instance inst, const dou
 void Model::improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const double& intervalsA, 
     const double& timePerIter, const double& gap, const double& overlap, Timer<std::chrono::milliseconds>& timer_cplex,
     float& opt_time,const double& timeLimit, float& elapsed_time, double& incumbent,  
-    unsigned int& stopsByGap,unsigned int& stopsByTime){
+    unsigned int& stopsByGap,unsigned int& stopsByTime, bool& isFeasibleRF){
     double prevObj = incumbent;	
 	int i=1;
     
@@ -2886,10 +2886,18 @@ void Model::improvementPhaseVND_timeIntervals(IloEnv& env, Instance inst, const 
 			prevObj = incumbent;			
 			if(i!=1){ //If is not the first iteration need to re-fix the interval				
 				// cout << "Re-fixing " << tS << "..." << tF << endl;
+				if(!isFeasibleRF){ //Only checkfeasibility if it was infeasible
+					// cout << "Check feasibility \n";
+					isFeasibleRF = isFeasible(env,inst);
+				}
 				fixSolution(env, inst, tS, tF,0,true);
 				i=1;
 			}else{ //Continue optimizing first interval
 				//~ cout "Solve again \n";
+				if(!isFeasibleRF){ //Only checkfeasibility if it was infeasible
+					// cout << "Check feasibility \n";
+					isFeasibleRF = isFeasible(env,inst);
+				}
 				goto optimize;
 			}            
 			
@@ -2949,7 +2957,7 @@ void Model::unFixInterval(Instance inst, const int& tS, const int& tF){
 }
 
 void Model::improvementPhase_typePortsLS(IloEnv env, Instance inst, const double& timePerIter, const int& gap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time,
-const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& stopsByGap,unsigned int& stopsByTime){
+const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& stopsByGap,unsigned int& stopsByTime,bool& isFeasibleRF){
 	Timer<chrono::milliseconds> timer_LS;
 	timer_LS.start();
 	int v,t,a, idPort;
@@ -3063,6 +3071,10 @@ const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& s
 						}
 					}
 				}
+			}
+			if(!isFeasibleRF){ //Only checkfeasibility if it was infeasible
+				// cout << "Check feasibility \n";
+				isFeasibleRF = isFeasible(env,inst);
 			}
             //~ cout << "Fixing TYPE REGION = " << i << endl;
             ///Re-fix the solved variables
@@ -3277,7 +3289,7 @@ void Model::fixVesselLessInterval(IloEnv env, Instance inst, const int& v, const
 
 void Model::improvementPhaseVND_intervalVessel(IloEnv& env, Instance inst, const double& intervalsA, const double& timePerIter, 
     const double& gap, const double& overlap, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, 
-    const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& stopsByGap,unsigned int& stopsByTime){        		
+    const double& timeLimit, float& elapsed_time, double& incumbent, unsigned int& stopsByGap,unsigned int& stopsByTime, bool& isFeasibleRF){        		
 	double prevObj = incumbent;
 		
 	int V = inst.speed.getSize();    
@@ -3323,14 +3335,26 @@ void Model::improvementPhaseVND_intervalVessel(IloEnv& env, Instance inst, const
 				prevObj = incumbent;
 				if(i==1 && v==0){ //Improvement on the first subproblem (does not need change the variables fixing/unfixing)
 					//~ cout << "re-optimize i=1 v=0\n";
+					if(!isFeasibleRF){ //Only checkfeasibility if it was infeasible
+						// cout << "Check feasibility \n";
+						isFeasibleRF = isFeasible(env,inst);
+					}
 					goto optmizeSameSubproblem;
 				}else if(i==1){
+					if(!isFeasibleRF){ //Only checkfeasibility if it was infeasible
+						// cout << "Check feasibility \n";
+						isFeasibleRF = isFeasible(env,inst);
+					}
 					fixVesselLessInterval(env,inst, v, tS, tF);
 					//~ cout << "Fixing vessel " << v << endl;
 					v=0;					
 				}else{ //i>1 and v>0
 					//~ cout << "Fixing vessel " << v << " and ";
 					//~ cout << "Fixing " << tS << "..." << tF << endl;
+					if(!isFeasibleRF){ //Only checkfeasibility if it was infeasible
+						// cout << "Check feasibility \n";
+						isFeasibleRF = isFeasible(env,inst);
+					}
 					fixAllSolution(env,inst);
 					v=0;
 					i=1;
@@ -3699,7 +3723,7 @@ const double& timeLimit, float& elapsed_time){
  */
 void Model::improvementPhaseVND_vessels(IloEnv& env, Instance inst, const double& timePerIter, const double& gap, 
 double& incumbent, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, const double& timeLimit, float& elapsed_time,
-	unsigned int& stopsByGap,unsigned int& stopsByTime){
+	unsigned int& stopsByGap,unsigned int& stopsByTime, bool& isFeasibleRF){
 	Timer<chrono::milliseconds> timer_LS;
 	timer_LS.start();
 	int v1, v2, V = inst.speed.getSize();
@@ -3741,10 +3765,18 @@ double& incumbent, Timer<chrono::milliseconds>& timer_cplex,float& opt_time, con
 					goto optimizeV2;
 				}else if(v1 == 0){ //When v1 = 0 Only fixes v2
 					//~ cout << "Fixing v2 " << v2 << endl;
+					if(!isFeasibleRF){ //Only checkfeasibility if it was infeasible
+						// cout << "Check feasibility \n";
+						isFeasibleRF = isFeasible(env,inst);
+					}
 					fixVessel(env,inst,v2,false);
 					v2=v1;						
 				}else{ //Refix both vessels
 					//~ cout << "Fixing " << v1 << " and " << v2 << endl;
+					if(!isFeasibleRF){ //Only checkfeasibility if it was infeasible
+						// cout << "Check feasibility \n";
+						isFeasibleRF = isFeasible(env,inst);
+					}
 					fixVesselPair(env, inst, v1,v2,false); 
 					v1 = 0;
 					v2 = 0;	
@@ -3832,7 +3864,40 @@ void Model::removeFeatures(Instance inst, const bool& validIneq, const bool& add
 		}
 	}
 }
-
+bool Model::isFeasible(IloEnv &env, Instance inst){
+	int j,t,T, J;	
+	T = inst.t;
+	J = inst.numTotalPorts;
+	double totalBeta=0;
+	double totalTheta=0;
+	IloArray<IloNumArray> betaVals(env, J+1); 
+	IloArray<IloNumArray> thetaVals(env, J+1); 
+	for(j=1;j<=J;j++){
+		betaVals[j] = IloNumArray(env, T+1);
+		thetaVals[j] = IloNumArray(env, T+1);
+		for(t=1;t<=T;t++){
+			betaVals[j][t] = cplex.getValue(beta[j][t]);
+			totalBeta += betaVals[j][t];
+			thetaVals[j][t] = cplex.getValue(theta[j][t]);
+			totalTheta += thetaVals[j][t];
+			if (betaVals[j][t] >= 0.01 || thetaVals[j][t] >= 0.01){				
+				return false;
+			}
+		}
+	}
+	return true;
+}
+#ifndef NBetas
+bool Model::removeBetas(IloEnv &env, Instance inst){
+	int j,t,T, J;	
+	T = inst.t;
+	J = inst.numTotalPorts;
+	for(j=1;j<=J;j++){
+		beta[j].end();
+		theta[j].end();
+	}
+}
+#endif
 /*
  * Note: 07-11-19 - parameter timePerInterval corresponds to the number of time periods per interval
  */  
@@ -3887,17 +3952,15 @@ const double& gapSecond){
 		model.setParameters(env, timePerIterFirst, gapFirst);
         
 		//Relax-and-fix
-		double p = timePerInterval*(1-overLap/100); // Units of t that are add at each iteration to the model.
-		// int s = T-(timePerInterval*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
+		double p = timePerInterval*(1-overLap/100); // Units of t that are add at each iteration to the model.		
 		double intPart;
 		int s;
 		if(modf(inst.t/timePerInterval,&intPart) > 0.0){ //When the last interval has less time periods
 			s = T-(timePerInterval*max(0.0,min(modf(inst.t/timePerInterval,&intPart)+endBlock-1,(double)endBlock))); 		 // Last t (relaxed) of model when starting relax-and-fix.
 		}else{//when all intervals have the same size
-			s = T-(timePerInterval*max(0.0,(double)endBlock)); 		 // Last t (relaxed) of model when starting relax-and-fix.
+			s = T-(timePerInterval*endBlock); 		 // Last t (relaxed) of model when starting relax-and-fix.
 		}
 			 
-		// int tOEB = inst.t - (timePerIntervalId*max(0.0,min(modf(inst.t/timePerInterval,&intPart)+endBlock-1,(double)endBlock))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
 		double sizeInterval = timePerInterval;		 // Last t of integer block (always starting with 1 integer interval)		
         int maxIt = ceil((T-sizeInterval)/p);					
         
@@ -3906,14 +3969,7 @@ const double& gapSecond){
 		string str = file.substr(pos);
 		str.erase(str.end()-1);
 		stringstream ss;
-		//ss << "test_no_beta/" << str << "_" << inst.t << ".mst";
 		ss << str << "_" << inst.t << ".mst";
-		//ss << "msts_no_form_adds/" << str << "_" << inst.t << ".mst";
-		//ss << "msts_only_VI/" << str << "_" << inst.t << ".mst";
-	    //ss << "msts_only_TightInventory/" << str << "_" << inst.t << ".mst";
-	    //ss << "msts_only_AddConst/" << str << "_" << inst.t << ".mst";
-		//ss << "msts_only_Simplification/" << str << "_" << inst.t << ".mst";
-		//ss << "msts_only_PropAlpha/" << str << "_" << inst.t << ".mst";
 
 		timer_1stPhase.start();
         // if(intervalsA == 0){
@@ -3986,49 +4042,60 @@ const double& gapSecond){
         // }
         // double incumbent = obj1stPhase;
         unsigned int stopsByGap=0, stopsByTime=0;
+        // cout << obj1stPhase << " - Check feasibility \n";
+        bool isFeasibleRF = model.isFeasible(env,inst);
+        bool removedBetas = false;
         #ifndef NImprovementPhase	
 		//~ //~ cout "\n\n\n\n IMPROVING SOLUTION... \n\n\n" << endl;
-		model.cplex.setParam(IloCplex::EpGap, 1e-04);	//Set default GAP
+		model.cplex.setParam(IloCplex::EpGap, 1e-04);	//Set default GAP		
         model.fixAllSolution(env, inst);
         
         //Remove additional constraints and valid inequalities
         // cout << "Removing Valid inequalities, additional constraints and others \n";        
         // model.cplex.exportModel("mipBefore.lp");
         model.removeFeatures(inst, validIneq, addConstr, tightenFlow);        
+
         // model.cplex.exportModel("mipAfter.lp");
 		double tLimit=timeLimit;
 		for(string::iterator it=fixOptStr.begin();it!=fixOptStr.end();++it){
+			#ifndef NBetas			
+	        if(isFeasibleRF && !removedBetas){
+	        	// cout << "Removing betas  \n";
+	        	model.removeBetas(env,inst);
+	        	removedBetas = true;
+	        }
+	        #endif
 			tLimit = timeLimit;
 			elapsed_time = 0;
 			switch(*it){
 				case 'a':
-					//~ cout << *it << " - Interval Vessels " << tLimit << "\n";
+					// cout << *it << " - Interval Vessels " << tLimit << "\n";
 					model.improvementPhaseVND_intervalVessel(env, inst, intervalsA, timePerIterSecond, gapSecond, overlapA, timer_cplex, opt_time, 
-						tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
+						tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime,isFeasibleRF);
 					time2ndPhase += elapsed_time;
 					break;
 				case 'b':
 					// cout << *it << " - Time Interval " << tLimit << "\n";
 					model.improvementPhaseVND_timeIntervals(env, inst, intervalsB, timePerIterSecond, gapSecond, overlapB, timer_cplex, opt_time, 
-						tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
+						tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime,isFeasibleRF);
 					time2ndPhase += elapsed_time;
 					break;
 				case 'c':
-					//~ cout << *it << " - Vessel Pairs " << tLimit << "\n";
-					model.improvementPhaseVND_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, tLimit, elapsed_time, stopsByGap, stopsByTime);
+					// cout << *it << " - Vessel Pairs " << tLimit << "\n";
+					model.improvementPhaseVND_vessels(env, inst, timePerIterSecond, gapSecond, incumbent, timer_cplex, opt_time, tLimit, elapsed_time, stopsByGap, stopsByTime,isFeasibleRF);
 					time2ndPhase += elapsed_time;
 					break;
 				case 'd':
-					//~ cout << *it << " - Port Type " << tLimit << "\n";
-					model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime);
+					// cout << *it << " - Port Type " << tLimit << "\n";
+					model.improvementPhase_typePortsLS(env, inst,timePerIterSecond, gapSecond, timer_cplex, opt_time, tLimit, elapsed_time, incumbent, stopsByGap, stopsByTime,isFeasibleRF);
 					time2ndPhase += elapsed_time;
 					break;
 				default:
 					cerr << "No fix-and-optimize procedure for " << *it << endl;
 					break;					
-			}
+			}		
 		}		
-						
+		// cout << "End imrpovement \n";				
         ///SOMENTE NESCESSARIO PARA OBTENÇÃO DE SOLUÇÃO COMPLETA
         model.cplex.setParam(IloCplex::TiLim, 1);        
         model.cplex.solve();
@@ -4043,28 +4110,7 @@ const double& gapSecond){
 		//~ model.cplex.setParam(IloCplex::NodeLim, 1);
 		//~ model.cplex.solve();
 		#ifdef NRelaxation
-		bool isInfeasible = false;
-        if(!abortedRF){
-			#ifndef NBetas
-			double totalBeta=0;
-			double totalTheta=0;
-			IloArray<IloNumArray> betaVals(env, J+1); 
-			IloArray<IloNumArray> thetaVals(env, J+1); 
-			for(j=1;j<=J;j++){
-				betaVals[j] = IloNumArray(env, T+1);
-				thetaVals[j] = IloNumArray(env, T+1);
-				for(t=1;t<=T;t++){
-					betaVals[j][t] = model.cplex.getValue(model.beta[j][t]);
-					totalBeta += betaVals[j][t];
-					thetaVals[j][t] = model.cplex.getValue(model.theta[j][t]);
-					totalTheta += thetaVals[j][t];
-					if (betaVals[j][t] >= 0.01 || thetaVals[j][t] >= 0.01){
-						isInfeasible = true;
-					}
-				}
-			}
-			#endif
-		}
+
 		
 		// model.printSolution(env, inst, T);
 		
@@ -4085,7 +4131,7 @@ const double& gapSecond){
 			// opt_time/1000 << "\t" <<
 			// (global_time-opt_time)/1000 << "\t" <<
 			// abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
-			// isInfeasible << "\t" <<
+			// !isFeasibleRF << "\t" <<
 			// stopsByGap << "\t" <<
 			// stopsByTime << "\t" <<
 			// endl;
