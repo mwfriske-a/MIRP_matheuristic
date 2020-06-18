@@ -9,7 +9,7 @@
 ## then the configuration is discarded.
 ##
 ## Examples of valid logical operators are: ==  !=  >=  <=  >  <  &  |  !  %in%
-(sizeInterval == 10) && (endBlock > 4) ##For sizeInterval = 10
-(sizeInterval == 15) && (endBlock > 2) ##For sizeInterval = 15
-(sizeInterval == 20) && (endBlock > 1) ##For sizeInterval = 15
+as.numeric(sizeInterval) == 10 & as.numeric(endBlock) > 4
+as.numeric(sizeInterval) == 15 & as.numeric(endBlock) > 2
+as.numeric(sizeInterval) == 20 & as.numeric(endBlock) > 1
 

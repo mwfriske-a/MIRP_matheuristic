@@ -27,13 +27,13 @@
 
 # 1:            2:                   3: 4:      5:
 sizeInterval    "-n "               c   (5,10,15,20)
-endBlock		"-e "         		c	(0,1,2,3,4,5,6,7,8,9,10)
+endBlock		"-e "         		c	(0,1,2,3,4,5,6,7,8,9,10)    
 overlapRf		"-o "	          	c	(0,10,25,50)
 gap 			"-g "    			c	(50,25,5,0.0001)
 addConst		"-c "         		i	(0,1)
 validIneq		"-q "        		i	(0,1)
-tightInventory	"-d "	            i	(0,1)	| endBlock > 0
-propAlpha		"-k "        		i	(0,1)	| endBlock > 0
+tightInventory	"-d "	            i	(0,1)	| as.numeric(endBlock) > 0
+propAlpha		"-k "        		i	(0,1)	| as.numeric(endBlock) > 0
 tightFlow		"-b "        		i	(0,1)
 fixOpt          "-s "               c	("a","b","c","d", "ab","ac","ad", "abc","abd", "acb","acd", "adb","adc", "abcd","abdc","acbd","acdb","adbc","adcb", "ba","bc","bd","bac","bca", "bad","bda", "bcd","bdc","bacd","badc","bcad","bcda","bdac","bdca", "ca","cb","cd", "cab","cba","cad","cda", "cbd","cdb","cabd","cadb","cbad","cbda","cdab","cdba", "da","db","dc", "dab", "dba", "dac", "dca", "dbc","dcb", "dabc","dacb","dbac","dbca","dcab","dcba")
 numintervalsA   "-m "               c   (2,3)

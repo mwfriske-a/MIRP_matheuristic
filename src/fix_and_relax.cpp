@@ -20,7 +20,7 @@
 #define NFixSinkArc
 
 //~ #define FixedGAP
-// #define NImprovementPhase
+#define NImprovementPhase
 #define NRandomTimeInterval				//Defined: Sequential selection of time intervals in the improvementPhase_timeIntervals, otherwise random selection
 
 #define PENALIZATION 1000
@@ -3972,7 +3972,7 @@ const double& gapSecond){
 		ss << str << "_" << inst.t << ".mst";
 
 		timer_1stPhase.start();
-        // if(intervalsA == 0){
+        if(intervalsA == 0){
 			#ifdef NRelaxation
 			for (v=1; v <= maxIt; v++){
 				timer_cplex.start();
@@ -4031,16 +4031,16 @@ const double& gapSecond){
 			if(!abortedRF){ ///Print solution and create MIPStart
 				 // cout << "Sucess!\n";
 				 //model.printSolution(env, inst, T);
-				 // model.cplex.writeMIPStarts(ss.str().c_str());
+				 model.cplex.writeMIPStarts(ss.str().c_str());
 			}
-		// }else{		
+		}else{		
 			//~ cout << "Reading MST file...\n";				//Uncomments this and the 6 lines below for testing R&F individually
-			// model.cplex.readMIPStarts(ss.str().c_str());
-			// model.cplex.setParam(IloCplex::TiLim, 1);        
-			// model.cplex.solve(); 
-			// obj1stPhase = model.cplex.getObjValue();       
-        // }
-        // double incumbent = obj1stPhase;
+			model.cplex.readMIPStarts(ss.str().c_str());
+			model.cplex.setParam(IloCplex::TiLim, 1);        
+			model.cplex.solve(); 
+			obj1stPhase = model.cplex.getObjValue();       
+        }
+        double incumbent = obj1stPhase;
         unsigned int stopsByGap=0, stopsByTime=0;
         // cout << obj1stPhase << " - Check feasibility \n";
         bool isFeasibleRF = model.isFeasible(env,inst);
@@ -4122,23 +4122,23 @@ const double& gapSecond){
 		#endif
 		
         /// Data (header in the main method)
-        // cout << str << "\t" <<
-			// maxIt << "\t" << 
-			// time1stPhase/1000 << "\t" <<
-			// obj1stPhase << "\t" << 
-			// time2ndPhase/1000 << "\t" << 
-			// obj2ndPhase << "\t" << 
-			// opt_time/1000 << "\t" <<
-			// (global_time-opt_time)/1000 << "\t" <<
-			// abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
-			// !isFeasibleRF << "\t" <<
-			// stopsByGap << "\t" <<
-			// stopsByTime << "\t" <<
-			// endl;
+        cout << str << "\t" <<
+			maxIt << "\t" << 
+			time1stPhase/1000 << "\t" <<
+			obj1stPhase << "\t" << 
+			time2ndPhase/1000 << "\t" << 
+			obj2ndPhase << "\t" << 
+			opt_time/1000 << "\t" <<
+			(global_time-opt_time)/1000 << "\t" <<
+			abs((obj2ndPhase/obj1stPhase - 1)*100) << "\t" <<
+			!isFeasibleRF << "\t" <<
+			stopsByGap << "\t" <<
+			stopsByTime << "\t" <<
+			endl;
 		///For iRace tests: <obj,time>
 		// cout << obj1stPhase << " " << time1stPhase/1000 << endl;
 		///Local search
-		cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
+		// cout << obj2ndPhase << " " << time2ndPhase/1000 << endl;
 		
         #endif
         

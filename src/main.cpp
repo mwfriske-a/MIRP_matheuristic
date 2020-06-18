@@ -5,7 +5,7 @@
 #include "../include/util.h"
 #include "../include/model.h"
 
-#define NTestInstanceSet
+// #define NTestInstanceSet
 using namespace std;
 
 
@@ -43,7 +43,7 @@ int main(const int argc, char** argv) {
 	int modelId;
 	stringstream file;
 	string fixOptStr;
-	double timeLimit, gapFirst, gapSecond, overLap, intervalsA, intervalsB, nIntervals, overlapA, overlapB;
+	double timeLimit, gapFirst, gapSecond, overLap, intervalsA=0.0, intervalsB=0.0, nIntervals, overlapA, overlapB;
 	int opt, endBlock, outVessel, timePerIterFirst, timePerIterSecond;
 	bool validIneq, addConstr, tightenInvConstr, proportionalAlpha, reduceArcs, tightenFlow; 	     	    
 
@@ -63,20 +63,20 @@ int main(const int argc, char** argv) {
 	instances.push_back("../Group1_data_format_only_files/LR2_22_DR3_333_VC4_V14a/");
 	instances.push_back("../Group1_data_format_only_files/LR2_22_DR3_333_VC4_V17a/");
 
-	// instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_3_VC1_V7a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V11a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V12a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V12b/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V8a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V9a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR1_2_DR1_3_VC2_V6a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR1_2_DR1_3_VC3_V8a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_22_VC3_V6a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC4_V11a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC5_V12a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR2_22_VC3_V10a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V14a/");
-	// instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V17a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_3_VC1_V7a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V11a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V12a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V12b/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V8a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR1_1_DR1_4_VC3_V9a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR1_2_DR1_3_VC2_V6a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR1_2_DR1_3_VC3_V8a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_22_VC3_V6a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC4_V11a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR2_11_DR2_33_VC5_V12a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR2_22_VC3_V10a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V14a/");
+	instances.push_back("../Group1_data_format_only_files/t60/LR2_22_DR3_333_VC4_V17a/");
 	while ((opt = getopt(argc,argv,"v:p:t:s:q:c:d:k:z:b:n:g:o:e:r:l:m:i:h:u:w:y:")) != EOF)
 	switch(opt)
 	{
@@ -164,19 +164,19 @@ int main(const int argc, char** argv) {
 			break;					
 		case 2: 
 			//Header
-			// cout << "Instance\t"  <<
-					// "Iter(RF)\t"  <<
-					// "Time(RF)\t"  <<
-					// "Obj(RF)\t"   <<
-					// "Time(FO)\t"  <<
-					// "Obj(FO)\t"   << 
-					// "CPX time\t"  << 
-					// "Otr time \t" << 
-					// "Impr \%\t"   << 
-					// "Inf\t"		  <<				
-					// "Stop by gap\t" <<
-					// "Stop by time\t" <<
-					// endl;
+			cout << "Instance\t"  <<
+					"Iter(RF)\t"  <<
+					"Time(RF)\t"  <<
+					"Obj(RF)\t"   <<
+					"Time(FO)\t"  <<
+					"Obj(FO)\t"   << 
+					"CPX time\t"  << 
+					"Otr time \t" << 
+					"Impr \%\t"   << 
+					"Inf\t"		  <<				
+					"Stop by gap\t" <<
+					"Stop by time\t" <<
+					endl;
 	        #ifndef NTestInstanceSet
 	        for(int i=0;i<instances.size();i++){
 	            mirp::fixAndRelax(instances[i], nIntervals, endBlock, overLap, gapFirst, timePerIterFirst, 

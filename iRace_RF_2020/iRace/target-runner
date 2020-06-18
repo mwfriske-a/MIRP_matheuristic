@@ -22,7 +22,7 @@ error() {
 }
 
 EXE=../../build/mirp.out
-FIXED_PARAMS="-v 2 -i 120 -t 3600"
+FIXED_PARAMS="-v 2 -i 120 -t 3600 -z 1"
 
 CONFIG_ID=$1
 INSTANCE_ID=$2
