@@ -20,7 +20,7 @@
 #define NFixSinkArc
 
 //~ #define FixedGAP
-#define NImprovementPhase
+// #define NImprovementPhase
 #define NRandomTimeInterval				//Defined: Sequential selection of time intervals in the improvementPhase_timeIntervals, otherwise random selection
 
 #define PENALIZATION 1000
@@ -66,8 +66,7 @@ void Model::buildFixAndRelaxModel(IloEnv& env, Instance inst, const double& time
 		tOEB = inst.t - (timePerIntervalId*max(0.0,min(modf(inst.t/timePerInterval,&intPart)+endBlock-1,(double)endBlock))) ; //Time periods out of End Block (index tOEB+1 is the first in the end block)
 	}else{
 		tOEB = inst.t - (timePerIntervalId*endBlock);
-	}
-
+	}	
 	int V = inst.speed.getSize(); //# of vessels
     int N = J + 2;
 	// cout << "Building model...\n Integer Block: [0," << timePerIntervalId
@@ -3804,6 +3803,7 @@ void Model::removeFeatures(Instance inst, const bool& validIneq, const bool& add
 	int i,j,t,v;
 	int J = inst.numTotalPorts;
 	if(validIneq){
+		cout << "Removing VI\n";
 		for(i=1;i<=J;i++){
 			if (inst.typePort[i-1] == 0){ 	//Loading port
 				model.remove(knapsack_P_1[i]);
@@ -3821,9 +3821,11 @@ void Model::removeFeatures(Instance inst, const bool& validIneq, const bool& add
 		for(v=0;v<inst.speed.getSize();v++){
 			for(i=1;i<=J;i++){
 				if(addConstr){
+					cout << "Removing Addconstr\n";
 					model.remove(operateAndDepart[v][i]);
 				}
 				if(tightenFlow){
+					cout << "Removing TF\n";
 					model.remove(flowMinCapacityOA[v][i]);
 					#ifndef WaitAfterOperate
 					model.remove(flowMinCapacityOB[v][i]);
@@ -3936,20 +3938,26 @@ const double& gapSecond){
 		int V = inst.speed.getSize(); //# of vessels
 
 		//Automatic parametrization
-		int endBlock = min((double)endBlockS,ceil(inst.t/timePerInterval)-2);	        
-		bool tightenInvConstr, proportionalAlpha;
-		if(endBlock>0){
-			tightenInvConstr = tightenInvConstrS;
-			proportionalAlpha = proportionalAlphaS;
-		}else{
+		int endBlock = max(0.0, min((double)endBlockS,ceil(inst.t/timePerInterval)-2));
+		bool tightenInvConstr=tightenInvConstrS, proportionalAlpha = proportionalAlphaS;
+		#ifdef NImprovementPhase		
+		if(endBlock<=0){
 			tightenInvConstr = false;
 			proportionalAlpha = false;
+		}
+		#endif
+		//Time
+		int timeLimitRF = timePerIterFirst;
+		if(inst.loadReg == 1){
+			timeLimitRF = 600;
+		}else{
+			timeLimitRF = 1000;
 		}
 		/// NEW MODEL		
 		Model model(env);
 		model.buildFixAndRelaxModel(env,inst, timePerInterval, endBlock, validIneq, addConstr, tightenInvConstr, 
 			proportionalAlpha, reduceArcs, tightenFlow);
-		model.setParameters(env, timePerIterFirst, gapFirst);
+		model.setParameters(env, timeLimitRF, gapFirst);
         
 		//Relax-and-fix
 		double p = timePerInterval*(1-overLap/100); // Units of t that are add at each iteration to the model.		
@@ -3969,7 +3977,7 @@ const double& gapSecond){
 		string str = file.substr(pos);
 		str.erase(str.end()-1);
 		stringstream ss;
-		ss << str << "_" << inst.t << ".mst";
+		ss << str << "_" << inst.t << "_VI" << validIneq << "_AC" << addConstr << "_TI" << tightenInvConstr << "_PAlpha" << proportionalAlpha << "_TF" << tightenFlow << ".mst";
 
 		timer_1stPhase.start();
         if(intervalsA == 0){

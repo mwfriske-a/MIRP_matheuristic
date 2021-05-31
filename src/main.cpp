@@ -5,7 +5,7 @@
 #include "../include/util.h"
 #include "../include/model.h"
 
-// #define NTestInstanceSet
+#define NTestInstanceSet
 using namespace std;
 
 
